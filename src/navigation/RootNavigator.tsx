@@ -9,9 +9,13 @@ import ArticlePreviewScreen from '../screens/ArticlePreviewScreen';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-export default function RootNavigator() {
+interface Props {
+  initialRouteName: keyof RootStackParamList;
+}
+
+export default function RootNavigator({ initialRouteName }: Props) {
   return (
-    <Stack.Navigator initialRouteName="Onboarding" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator initialRouteName={initialRouteName} screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Main" component={MainTabs} />

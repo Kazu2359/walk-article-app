@@ -1,28 +1,59 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, FlatList } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, FlatList, ActivityIndicator } from 'react-native';
 import type { MainTabScreenProps } from '../navigation/types';
 import { useTheme } from '../constants/theme';
+import { useAuth } from '../hooks/AuthContext';
+import { listRecordings, type ArticlePlatform } from '../services/api';
 
 type Props = MainTabScreenProps<'History'>;
 
-type HistoryItem = {
-  id: string;
-  platform: 'Note' | 'X';
+type Row = {
+  key: string;
+  recordingId: string;
+  platform: ArticlePlatform;
   excerpt: string;
   date: string;
 };
 
-const DUMMY_HISTORY: HistoryItem[] = [
-  { id: '1', platform: 'Note', excerpt: '散歩しながら考えたこと', date: '2026-07-16 09:12' },
-  { id: '2', platform: 'X', excerpt: '散歩しながら考えをまとめるの、地味に効果ある', date: '2026-07-15 18:40' },
-  { id: '3', platform: 'Note', excerpt: '朝の散歩で見つけた小さな発見', date: '2026-07-14 07:55' },
-];
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 export default function HistoryScreen({ navigation }: Props) {
   const theme = useTheme();
+  const { accessToken } = useAuth();
   const [query, setQuery] = useState('');
+  const [rows, setRows] = useState<Row[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const filtered = DUMMY_HISTORY.filter((item) => item.excerpt.includes(query));
+  const load = useCallback(
+    (searchQuery: string) => {
+      if (!accessToken) return;
+      setIsLoading(true);
+      listRecordings(accessToken, { query: searchQuery || undefined })
+        .then(({ items }) => {
+          const flattened = items.flatMap((item) =>
+            item.articles.map((article) => ({
+              key: `${item.id}-${article.platform}`,
+              recordingId: item.id,
+              platform: article.platform,
+              excerpt: article.excerpt,
+              date: formatDate(item.recordedAt),
+            })),
+          );
+          setRows(flattened);
+        })
+        .catch(() => setRows([]))
+        .finally(() => setIsLoading(false));
+    },
+    [accessToken],
+  );
+
+  useEffect(() => {
+    load('');
+  }, [load]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
@@ -33,9 +64,15 @@ export default function HistoryScreen({ navigation }: Props) {
           placeholderTextColor={theme.muted}
           value={query}
           onChangeText={setQuery}
+          onSubmitEditing={() => load(query)}
+          returnKeyType="search"
         />
 
-        {filtered.length === 0 ? (
+        {isLoading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color={theme.accent} />
+          </View>
+        ) : rows.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: theme.muted }]}>まだ記事がありません</Text>
             <Pressable onPress={() => navigation.navigate('Home')}>
@@ -44,22 +81,22 @@ export default function HistoryScreen({ navigation }: Props) {
           </View>
         ) : (
           <FlatList
-            data={filtered}
-            keyExtractor={(item) => item.id}
+            data={rows}
+            keyExtractor={(row) => row.key}
             contentContainerStyle={{ gap: 8 }}
             renderItem={({ item }) => (
               <Pressable
                 style={[styles.card, { borderColor: theme.wire }]}
-                onPress={() => navigation.navigate('ArticlePreview')}
+                onPress={() => navigation.navigate('ArticlePreview', { recordingId: item.recordingId })}
               >
                 <View
                   style={[
                     styles.tag,
-                    { backgroundColor: item.platform === 'Note' ? theme.accentDim : theme.wireFill },
+                    { backgroundColor: item.platform === 'note' ? theme.accentDim : theme.wireFill },
                   ]}
                 >
-                  <Text style={[styles.tagText, { color: item.platform === 'Note' ? theme.accent : theme.muted }]}>
-                    {item.platform}
+                  <Text style={[styles.tagText, { color: item.platform === 'note' ? theme.accent : theme.muted }]}>
+                    {item.platform === 'note' ? 'Note' : 'X'}
                   </Text>
                 </View>
                 <View style={styles.cardBody}>

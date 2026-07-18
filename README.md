@@ -19,7 +19,7 @@
 - **モバイルアプリ**: React Native + Expo + TypeScript
   開発機がWindows（WSL2）でXcodeが使えないため、EAS Buildによるクラウドビルドで
   コード記述〜実機ビルド〜TestFlight提出までをMacなしで完結できる構成を採用した。
-- **バックエンド（予定）**: Node.js + TypeScript + Fastify + PostgreSQL + Redis/BullMQ + Cloudflare R2
+- **バックエンド**: Node.js + TypeScript + Fastify + PostgreSQL + Redis/BullMQ + Cloudflare R2（[Kazu2359/walk-article-backend](https://github.com/Kazu2359/walk-article-backend)、別リポジトリ）
 - **文字起こし**: Whisper API
 - **記事生成**: Claude API
 
@@ -47,15 +47,36 @@ npx expo start --tunnel
 
 WSL2環境はNATモードのため、Expo Goとの接続には`--tunnel`オプションが必須。QRコードをExpo Goアプリ（iPhone）で読み込むと起動する。
 
+### バックエンドAPIへの接続先
+
+デフォルトは`http://localhost:3000`（シミュレータ向け）。実機（Expo Go/開発ビルド）からバックエンドに接続する場合は、PCのLAN IPやトンネルURLを`EXPO_PUBLIC_API_BASE_URL`で指定する：
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=https://your-tunnel-url npx expo start --tunnel
+```
+
+バックエンド（`walk-article-backend`）側は`docker compose up -d`・`npm run dev`・`npm run worker:dev`を起動しておく。
+
 ## フォルダ構成
 
 ```
 src/
-├── screens/       画面コンポーネント（8画面）
+├── screens/       画面コンポーネント（8画面、バックエンドAPIに接続済み）
 ├── navigation/    React Navigation（Stack + Bottom Tabs）
 ├── components/    共通UIコンポーネント（今後追加）
-├── hooks/         カスタムフック（今後追加）
-├── services/      API通信・外部サービス連携（今後追加）
+├── hooks/         AuthContext（JWTの保持・Sign in with Apple→バックエンド認証）
+├── services/      api.ts（バックエンドAPIクライアント、fetchラッパー）
 ├── types/         型定義（今後追加）
 └── constants/     配色テーマなどの定数
 ```
+
+## バックエンド連携の実装状況
+
+- [x] 認証: Sign in with Apple → `POST /v1/auth/apple` → JWTを`expo-secure-store`に保存し起動時に復元
+- [x] 録音: `expo-audio`で実録音 → `POST /v1/recordings`でR2署名付きURL取得 → 直PUT → `complete-upload`
+- [x] 処理状況: `GET /v1/recordings/:id`をポーリングして文字起こし→記事生成の進捗を表示
+- [x] 記事プレビュー・編集: `GET /v1/recordings/:id/articles`取得、`PATCH /v1/articles/:id`で編集保存、コピー時に`mark-copied`を記録
+- [x] 履歴: `GET /v1/recordings`で検索・一覧表示
+- [x] 設定: `GET`/`PATCH /v1/me/settings`でトーン変更・Expo Pushトークン登録（`POST /v1/me/push-tokens`）
+- [ ] X連携・自動投稿（Phase2、バックエンド側も未実装）
+- [ ] 実機（EAS開発ビルド）での動作確認 — バックグラウンド録音・プッシュ通知の実機受信はExpo Goでは検証できないため（§9-3で決定済み）、EAS開発ビルドでの確認が必要

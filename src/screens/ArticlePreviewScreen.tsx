@@ -1,32 +1,86 @@
-import { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useTheme } from '../constants/theme';
+import { useAuth } from '../hooks/AuthContext';
+import { getRecordingArticles, markArticleCopied, updateArticle, type RecordingArticle } from '../services/api';
 
 type Props = RootStackScreenProps<'ArticlePreview'>;
 type Tab = 'note' | 'x';
 
-const DUMMY_ARTICLES: Record<Tab, { title: string; body: string }> = {
-  note: {
-    title: '散歩しながら考えたこと',
-    body: '今日は近所を30分ほど歩きながら、最近考えていたアイデアについて話してみました。歩くとなぜか頭が整理されて、言葉が自然に出てくる気がします。',
-  },
-  x: {
-    title: '',
-    body: '散歩しながら考えをまとめるの、地味に効果ある。頭の中がスッキリする。#散歩思考',
-  },
-};
-
-export default function ArticlePreviewScreen({ navigation }: Props) {
+export default function ArticlePreviewScreen({ navigation, route }: Props) {
   const theme = useTheme();
-  const [tab, setTab] = useState<Tab>('note');
-  const [copied, setCopied] = useState(false);
-  const article = DUMMY_ARTICLES[tab];
+  const { accessToken } = useAuth();
+  const { recordingId } = route.params;
 
-  const handleCopy = () => {
+  const [articles, setArticles] = useState<Record<Tab, RecordingArticle> | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [tab, setTab] = useState<Tab>('note');
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    getRecordingArticles(accessToken, recordingId)
+      .then(({ articles: fetched }) => {
+        const byPlatform = Object.fromEntries(fetched.map((article) => [article.platform, article])) as Record<
+          Tab,
+          RecordingArticle
+        >;
+        setArticles(byPlatform);
+      })
+      .catch(() => Alert.alert('記事の取得に失敗しました'))
+      .finally(() => setIsLoading(false));
+  }, [accessToken, recordingId]);
+
+  useEffect(() => {
+    const current = articles?.[tab];
+    if (!current) return;
+    setTitle(current.title ?? '');
+    setBody(current.editedBody ?? current.body);
+  }, [articles, tab]);
+
+  const saveEdits = useCallback(
+    async (nextTitle: string, nextBody: string) => {
+      const current = articles?.[tab];
+      if (!accessToken || !current) return;
+      try {
+        const updated = await updateArticle(accessToken, current.id, {
+          editedBody: nextBody,
+          ...(current.platform === 'note' ? { editedTitle: nextTitle } : {}),
+        });
+        setArticles((prev) => (prev ? { ...prev, [tab]: updated } : prev));
+      } catch {
+        // 編集の保存に失敗しても画面上のテキストはそのまま残す
+      }
+    },
+    [accessToken, articles, tab],
+  );
+
+  const handleCopy = async () => {
+    await Clipboard.setStringAsync(tab === 'note' ? `${title}\n\n${body}` : body);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+
+    const current = articles?.[tab];
+    if (accessToken && current) {
+      markArticleCopied(accessToken, current.id).catch(() => {
+        // コピー記録の失敗はユーザー操作をブロックしない
+      });
+    }
   };
+
+  if (isLoading || !articles) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={theme.accent} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
@@ -52,12 +106,20 @@ export default function ArticlePreviewScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {article.title.length > 0 && (
-          <TextInput style={[styles.heading, { color: theme.ink }]} value={article.title} multiline />
+        {tab === 'note' && (
+          <TextInput
+            style={[styles.heading, { color: theme.ink }]}
+            value={title}
+            onChangeText={setTitle}
+            onEndEditing={() => saveEdits(title, body)}
+            multiline
+          />
         )}
         <TextInput
           style={[styles.body, { color: theme.ink, borderColor: theme.line }]}
-          value={article.body}
+          value={body}
+          onChangeText={setBody}
+          onEndEditing={() => saveEdits(title, body)}
           multiline
         />
 
@@ -75,6 +137,7 @@ export default function ArticlePreviewScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, padding: 16, gap: 10 },
   tabRow: { flexDirection: 'row', gap: 6 },
   tabButton: { flex: 1, height: 36, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },

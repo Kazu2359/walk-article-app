@@ -7,8 +7,8 @@ export type RootStackParamList = {
   Login: undefined;
   Main: NavigatorScreenParams<MainTabParamList> | undefined;
   Recording: undefined;
-  Processing: undefined;
-  ArticlePreview: undefined;
+  Processing: { recordingId: string };
+  ArticlePreview: { recordingId: string };
 };
 
 export type MainTabParamList = {

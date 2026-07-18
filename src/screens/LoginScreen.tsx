@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Platform } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, Platform, Alert } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useTheme } from '../constants/theme';
+import { useAuth } from '../hooks/AuthContext';
+import { ApiError } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 export default function LoginScreen({ navigation }: Props) {
   const theme = useTheme();
+  const { signInWithApple } = useAuth();
   const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
+  const [isSigningIn, setIsSigningIn] = useState(false);
 
   useEffect(() => {
     if (Platform.OS !== 'ios') return;
@@ -17,17 +21,35 @@ export default function LoginScreen({ navigation }: Props) {
   }, []);
 
   const handleSignIn = async () => {
+    if (isSigningIn) return;
+    setIsSigningIn(true);
     try {
-      await AppleAuthentication.signInAsync({
+      const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-    } catch {
-      // バックエンド未接続のため、この段階では認証結果を検証せず先へ進む
+
+      if (!credential.identityToken) {
+        throw new Error('Appleからidentity tokenを取得できませんでした');
+      }
+
+      await signInWithApple(credential.identityToken, {
+        givenName: credential.fullName?.givenName,
+        familyName: credential.fullName?.familyName,
+      });
+
+      navigation.replace('Main');
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ERR_REQUEST_CANCELED') {
+        return;
+      }
+      const message = error instanceof ApiError ? error.message : 'サインインに失敗しました。もう一度お試しください。';
+      Alert.alert('サインインエラー', message);
+    } finally {
+      setIsSigningIn(false);
     }
-    navigation.replace('Main');
   };
 
   return (
@@ -51,6 +73,8 @@ export default function LoginScreen({ navigation }: Props) {
             <Text style={styles.fallbackButtonText}>Appleでサインイン</Text>
           </Pressable>
         )}
+
+        {isSigningIn && <Text style={[styles.terms, { color: theme.muted }]}>サインイン中…</Text>}
 
         <Text style={[styles.terms, { color: theme.muted }]}>利用規約・プライバシーポリシー</Text>
       </View>

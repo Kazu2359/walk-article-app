@@ -1,8 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import { useAudioRecorder, useAudioRecorderState, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useTheme } from '../constants/theme';
+import { useAuth } from '../hooks/AuthContext';
+import { completeUpload, createRecording, uploadAudioToStorage } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Recording'>;
 
@@ -17,17 +20,77 @@ const BAR_HEIGHTS = [14, 28, 10, 36, 20, 30, 16, 24];
 
 export default function RecordingScreen({ navigation }: Props) {
   const theme = useTheme();
+  const { accessToken } = useAuth();
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorderState = useAudioRecorderState(recorder);
   const [elapsed, setElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startedAtRef = useRef(new Date());
 
   useEffect(() => {
-    if (isPaused) return;
+    let isMounted = true;
+    (async () => {
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await recorder.prepareToRecordAsync();
+      if (!isMounted) return;
+      startedAtRef.current = new Date();
+      recorder.record();
+    })();
+    return () => {
+      isMounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (isPaused || isUploading) return;
     intervalRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused]);
+  }, [isPaused, isUploading]);
+
+  const handleTogglePause = () => {
+    if (isPaused) {
+      recorder.record();
+      setIsPaused(false);
+    } else {
+      recorder.pause();
+      setIsPaused(true);
+    }
+  };
+
+  const handleStop = async () => {
+    if (isUploading || !accessToken) return;
+    setIsUploading(true);
+    try {
+      await recorder.stop();
+      const uri = recorder.uri;
+      if (!uri) {
+        throw new Error('録音ファイルの取得に失敗しました');
+      }
+
+      const audio = await (await fetch(uri)).blob();
+
+      const { recordingId, uploadUrl } = await createRecording(accessToken, {
+        durationSeconds: Math.max(elapsed, 1),
+        fileSizeBytes: audio.size,
+        recordedAt: startedAtRef.current.toISOString(),
+      });
+
+      await uploadAudioToStorage(uploadUrl, audio);
+      await completeUpload(accessToken, recordingId);
+
+      navigation.replace('Processing', { recordingId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'アップロードに失敗しました';
+      Alert.alert('録音の保存に失敗しました', message, [{ text: 'OK', onPress: () => navigation.goBack() }]);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
@@ -42,27 +105,37 @@ export default function RecordingScreen({ navigation }: Props) {
           {BAR_HEIGHTS.map((h, i) => (
             <View
               key={i}
-              style={[styles.meterBar, { height: isPaused ? 6 : h, backgroundColor: theme.wire }]}
+              style={[
+                styles.meterBar,
+                { height: isPaused || !recorderState.isRecording ? 6 : h, backgroundColor: theme.wire },
+              ]}
             />
           ))}
         </View>
 
-        <View style={styles.controls}>
-          <Pressable
-            style={[styles.circleButton, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}
-            onPress={() => setIsPaused((p) => !p)}
-          >
-            <Text style={[styles.circleButtonText, { color: theme.muted }]}>
-              {isPaused ? '再開' : '一時停止'}
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.circleButton, { backgroundColor: theme.accent, borderColor: theme.accent }]}
-            onPress={() => navigation.replace('Processing')}
-          >
-            <Text style={[styles.circleButtonText, { color: '#fff' }]}>停止</Text>
-          </Pressable>
-        </View>
+        {isUploading ? (
+          <View style={styles.controls}>
+            <ActivityIndicator size="large" color={theme.accent} />
+            <Text style={[styles.noteText, { color: theme.muted }]}>アップロード中…</Text>
+          </View>
+        ) : (
+          <View style={styles.controls}>
+            <Pressable
+              style={[styles.circleButton, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}
+              onPress={handleTogglePause}
+            >
+              <Text style={[styles.circleButtonText, { color: theme.muted }]}>
+                {isPaused ? '再開' : '一時停止'}
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.circleButton, { backgroundColor: theme.accent, borderColor: theme.accent }]}
+              onPress={handleStop}
+            >
+              <Text style={[styles.circleButtonText, { color: '#fff' }]}>停止</Text>
+            </Pressable>
+          </View>
+        )}
 
         <View style={[styles.note, { borderColor: theme.wire }]}>
           <Text style={[styles.noteText, { color: theme.muted }]}>
@@ -82,7 +155,7 @@ const styles = StyleSheet.create({
   timer: { fontSize: 32, fontWeight: '700', fontVariant: ['tabular-nums'] },
   meter: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 40 },
   meterBar: { width: 4, borderRadius: 2 },
-  controls: { flexDirection: 'row', gap: 18, marginTop: 10 },
+  controls: { flexDirection: 'row', gap: 18, marginTop: 10, alignItems: 'center' },
   circleButton: {
     width: 72,
     height: 72,

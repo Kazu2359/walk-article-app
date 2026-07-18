@@ -1,11 +1,28 @@
+import { useCallback, useState } from 'react';
 import { StyleSheet, Text, View, Pressable, SafeAreaView } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { MainTabScreenProps } from '../navigation/types';
 import { useTheme } from '../constants/theme';
+import { useAuth } from '../hooks/AuthContext';
+import { listRecordings, type HistoryItem } from '../services/api';
 
 type Props = MainTabScreenProps<'Home'>;
 
 export default function HomeScreen({ navigation }: Props) {
   const theme = useTheme();
+  const { accessToken } = useAuth();
+  const [recent, setRecent] = useState<HistoryItem | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!accessToken) return;
+      listRecordings(accessToken, { limit: 1 })
+        .then(({ items }) => setRecent(items[0] ?? null))
+        .catch(() => setRecent(null));
+    }, [accessToken]),
+  );
+
+  const excerpt = recent?.articles[0]?.excerpt;
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
@@ -23,10 +40,16 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={[styles.recordHint, { color: theme.muted }]}>タップで録音開始</Text>
       </View>
 
-      <View style={[styles.recentCard, { borderColor: theme.wire }]}>
+      <Pressable
+        style={[styles.recentCard, { borderColor: theme.wire }]}
+        disabled={!recent}
+        onPress={() => recent && navigation.navigate('ArticlePreview', { recordingId: recent.id })}
+      >
         <View style={[styles.recentThumb, { backgroundColor: theme.wireFill2, borderColor: theme.wire }]} />
-        <Text style={[styles.recentText, { color: theme.muted }]}>まだ記事がありません</Text>
-      </View>
+        <Text style={[styles.recentText, { color: theme.muted }]} numberOfLines={1}>
+          {excerpt ?? 'まだ記事がありません'}
+        </Text>
+      </Pressable>
     </SafeAreaView>
   );
 }
@@ -61,5 +84,5 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   recentThumb: { width: 36, height: 36, borderRadius: 6, borderWidth: 1 },
-  recentText: { fontSize: 12 },
+  recentText: { flex: 1, fontSize: 12 },
 });
