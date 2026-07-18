@@ -57,6 +57,16 @@ EXPO_PUBLIC_API_BASE_URL=https://your-tunnel-url npx expo start --tunnel
 
 バックエンド（`walk-article-backend`）側は`docker compose up -d`・`npm run dev`・`npm run worker:dev`を起動しておく。
 
+### 実機ビルドと本番バックエンドへの接続
+
+実機（EAS開発ビルド）はPCとは別ネットワークの端末なので、WSL2のNAT越しのトンネル接続（Expo Goで一度ハマった問題）を避けるため、**バックエンドは先にRailway/Fly.ioへデプロイしてから実機ビルドする**順序を推奨する（ローカルDocker＋トンネルを二重にセットアップしなくて済む）。
+
+1. `walk-article-backend`を[DEPLOY.md](https://github.com/Kazu2359/walk-article-backend/blob/main/DEPLOY.md)の手順でRailway/Fly.ioへデプロイし、公開URLを控える
+2. デプロイ先に対して`SMOKE_TEST_BASE_URL=<デプロイ先URL> SMOKE_TEST_AUDIO_PATH=./sample.m4a npm run smoke`（`walk-article-backend`側）でE2E疎通確認
+3. `eas.json`の`build.development.env.EXPO_PUBLIC_API_BASE_URL`（および`production`側）をそのURLに書き換える
+4. `eas build --profile development --platform ios`で開発ビルドを作成し、iPhoneにインストール
+5. 実機で一連の動作を確認する。**Sign in with Appleを最初に確認する**こと（Apple署名済みidentity tokenでのJWKS検証は自動テスト・スモークテストではバイパスしており、実機で初めて検証されるため） → 録音 → アップロード → 処理中表示 → 記事プレビュー・編集 → 履歴 → プッシュ通知 → アカウント削除
+
 ## フォルダ構成
 
 ```
@@ -77,6 +87,6 @@ src/
 - [x] 処理状況: `GET /v1/recordings/:id`をポーリングして文字起こし→記事生成の進捗を表示
 - [x] 記事プレビュー・編集: `GET /v1/recordings/:id/articles`取得、`PATCH /v1/articles/:id`で編集保存、コピー時に`mark-copied`を記録
 - [x] 履歴: `GET /v1/recordings`で検索・一覧表示
-- [x] 設定: `GET`/`PATCH /v1/me/settings`でトーン変更・Expo Pushトークン登録（`POST /v1/me/push-tokens`）
+- [x] 設定: `GET`/`PATCH /v1/me/settings`でトーン変更・Expo Pushトークン登録（`POST /v1/me/push-tokens`）・アカウント削除（`DELETE /v1/me`、App Store 5.1.1(v)対応）
 - [ ] X連携・自動投稿（Phase2、バックエンド側も未実装）
-- [ ] 実機（EAS開発ビルド）での動作確認 — バックグラウンド録音・プッシュ通知の実機受信はExpo Goでは検証できないため（§9-3で決定済み）、EAS開発ビルドでの確認が必要
+- [ ] 実機（EAS開発ビルド）での動作確認 — バックグラウンド録音・プッシュ通知の実機受信はExpo Goでは検証できないため（§9-3で決定済み）、EAS開発ビルドでの確認が必要。手順は下記「実機ビルドと本番バックエンドへの接続」を参照
