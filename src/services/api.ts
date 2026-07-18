@@ -189,3 +189,8 @@ export function updateSettings(
 export function registerPushToken(accessToken: string, expoPushToken: string): Promise<void> {
   return request('/v1/me/push-tokens', { method: 'POST', body: { expoPushToken }, accessToken });
 }
+
+// App Store審査ガイドライン5.1.1(v)対応。関連する録音・記事・音声も含めてサーバー側で完全削除する
+export function deleteAccount(accessToken: string): Promise<void> {
+  return request('/v1/me', { method: 'DELETE', accessToken });
+}

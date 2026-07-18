@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Switch, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, Switch, ActivityIndicator, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainTabScreenProps, RootStackParamList } from '../navigation/types';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
-import { getSettings, registerPushToken, updateSettings, type Tone } from '../services/api';
+import { deleteAccount, getSettings, registerPushToken, updateSettings, type Tone } from '../services/api';
 
 type Props = MainTabScreenProps<'Settings'>;
 
@@ -22,6 +22,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [autoPost, setAutoPost] = useState(false);
   const [tone, setTone] = useState<Tone>('casual');
   const [isLoading, setIsLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -70,10 +71,41 @@ export default function SettingsScreen({ navigation }: Props) {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
+  const goToLogin = () => {
     const rootNavigation = navigation.getParent<NativeStackNavigationProp<RootStackParamList>>();
     rootNavigation?.reset({ index: 0, routes: [{ name: 'Login' }] });
+  };
+
+  const handleLogout = async () => {
+    await signOut();
+    goToLogin();
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'アカウントを削除しますか？',
+      '録音・記事・音声を含むすべてのデータが削除されます。この操作は取り消せません。',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除する',
+          style: 'destructive',
+          onPress: async () => {
+            if (!accessToken || isDeleting) return;
+            setIsDeleting(true);
+            try {
+              await deleteAccount(accessToken);
+              await signOut();
+              goToLogin();
+            } catch {
+              Alert.alert('アカウントの削除に失敗しました', 'しばらくしてからもう一度お試しください。');
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   if (isLoading) {
@@ -135,6 +167,18 @@ export default function SettingsScreen({ navigation }: Props) {
         <Pressable style={[styles.logoutRow, { borderColor: theme.wire }]} onPress={handleLogout}>
           <Text style={[styles.logoutText, { color: theme.muted }]}>ログアウト</Text>
         </Pressable>
+
+        <Pressable
+          style={[styles.deleteRow, { borderColor: theme.wire }]}
+          onPress={handleDeleteAccount}
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <ActivityIndicator size="small" color={theme.accent} />
+          ) : (
+            <Text style={[styles.deleteText, { color: theme.accent }]}>アカウントを削除</Text>
+          )}
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -156,4 +200,6 @@ const styles = StyleSheet.create({
   spacer: { flex: 1 },
   logoutRow: { borderWidth: 1.5, borderRadius: 10, padding: 12, alignItems: 'center' },
   logoutText: { fontSize: 13, fontWeight: '600' },
+  deleteRow: { borderWidth: 1.5, borderRadius: 10, padding: 12, alignItems: 'center' },
+  deleteText: { fontSize: 13, fontWeight: '700' },
 });
