@@ -173,6 +173,10 @@ export function markArticleCopied(accessToken: string, articleId: string): Promi
   return request(`/v1/articles/${articleId}/mark-copied`, { method: 'POST', accessToken });
 }
 
+export function deleteArticle(accessToken: string, articleId: string): Promise<void> {
+  return request(`/v1/articles/${articleId}`, { method: 'DELETE', accessToken });
+}
+
 // ---- 設定・アカウント（§13） ----
 
 export function getSettings(accessToken: string): Promise<{ tone: Tone; autoPostXEnabled: boolean }> {

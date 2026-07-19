@@ -1,10 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, ActivityIndicator, Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
 import type { RootStackScreenProps } from '../navigation/types';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
-import { getRecordingArticles, markArticleCopied, updateArticle, type RecordingArticle } from '../services/api';
+import {
+  deleteArticle,
+  getRecordingArticles,
+  markArticleCopied,
+  updateArticle,
+  type RecordingArticle,
+} from '../services/api';
 
 type Props = RootStackScreenProps<'ArticlePreview'>;
 type Tab = 'note' | 'x';
@@ -14,7 +21,7 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
   const { accessToken } = useAuth();
   const { recordingId } = route.params;
 
-  const [articles, setArticles] = useState<Record<Tab, RecordingArticle> | null>(null);
+  const [articles, setArticles] = useState<Partial<Record<Tab, RecordingArticle>> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<Tab>('note');
   const [title, setTitle] = useState('');
@@ -25,10 +32,9 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
     if (!accessToken) return;
     getRecordingArticles(accessToken, recordingId)
       .then(({ articles: fetched }) => {
-        const byPlatform = Object.fromEntries(fetched.map((article) => [article.platform, article])) as Record<
-          Tab,
-          RecordingArticle
-        >;
+        const byPlatform = Object.fromEntries(
+          fetched.map((article) => [article.platform, article]),
+        ) as Partial<Record<Tab, RecordingArticle>>;
         setArticles(byPlatform);
       })
       .catch(() => Alert.alert('記事の取得に失敗しました'))
@@ -41,6 +47,18 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
     setTitle(current.title ?? '');
     setBody(current.editedBody ?? current.body);
   }, [articles, tab]);
+
+  // 表示中のタブの記事が削除された場合、もう一方のタブへ切り替えるか、
+  // どちらも無ければ履歴一覧へ戻る
+  useEffect(() => {
+    if (!articles || articles[tab]) return;
+    const otherTab: Tab = tab === 'note' ? 'x' : 'note';
+    if (articles[otherTab]) {
+      setTab(otherTab);
+    } else {
+      navigation.navigate('Main', { screen: 'History' });
+    }
+  }, [articles, tab, navigation]);
 
   const saveEdits = useCallback(
     async (nextTitle: string, nextBody: string) => {
@@ -60,16 +78,58 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
   );
 
   const handleCopy = async () => {
+    const current = articles?.[tab];
+    if (!current) return;
+
     await Clipboard.setStringAsync(tab === 'note' ? `${title}\n\n${body}` : body);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
 
-    const current = articles?.[tab];
-    if (accessToken && current) {
+    if (accessToken) {
       markArticleCopied(accessToken, current.id).catch(() => {
         // コピー記録の失敗はユーザー操作をブロックしない
       });
     }
+
+    try {
+      if (tab === 'x') {
+        // Xは投稿画面に文面を事前入力した状態で開ける
+        await Linking.openURL(`https://x.com/intent/post?text=${encodeURIComponent(body)}`);
+      } else {
+        // Noteには下書きを事前入力するAPIがないため、開いた上で手動貼り付けを案内する（§9-1）
+        await Linking.openURL('https://note.com');
+        Alert.alert('コピーしました', 'Noteを開きました。コピーした内容を貼り付けて投稿してください。');
+      }
+    } catch {
+      Alert.alert('コピーしました', `${tab === 'x' ? 'X' : 'Note'}を開けませんでした。アプリを開いて貼り付けてください。`);
+    }
+  };
+
+  const handleDelete = () => {
+    const current = articles?.[tab];
+    if (!current) return;
+
+    Alert.alert('この記事を削除しますか？', 'この操作は取り消せません。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '削除する',
+        style: 'destructive',
+        onPress: async () => {
+          if (!accessToken) return;
+          try {
+            await deleteArticle(accessToken, current.id);
+            setArticles((prev) => {
+              if (!prev) return prev;
+              const next = { ...prev };
+              delete next[tab];
+              return next;
+            });
+          } catch {
+            Alert.alert('削除に失敗しました', 'しばらくしてからもう一度お試しください。');
+          }
+        },
+      },
+    ]);
   };
 
   if (isLoading || !articles) {
@@ -85,24 +145,29 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
       <View style={styles.container}>
-        <View style={styles.tabRow}>
-          <Pressable
-            style={[
-              styles.tabButton,
-              { backgroundColor: tab === 'note' ? theme.accent : theme.wireFill, borderColor: tab === 'note' ? theme.accent : theme.wire },
-            ]}
-            onPress={() => setTab('note')}
-          >
-            <Text style={[styles.tabButtonText, { color: tab === 'note' ? '#fff' : theme.muted }]}>Note用</Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.tabButton,
-              { backgroundColor: tab === 'x' ? theme.accent : theme.wireFill, borderColor: tab === 'x' ? theme.accent : theme.wire },
-            ]}
-            onPress={() => setTab('x')}
-          >
-            <Text style={[styles.tabButtonText, { color: tab === 'x' ? '#fff' : theme.muted }]}>X用</Text>
+        <View style={styles.topRow}>
+          <View style={styles.tabRow}>
+            <Pressable
+              style={[
+                styles.tabButton,
+                { backgroundColor: tab === 'note' ? theme.accent : theme.wireFill, borderColor: tab === 'note' ? theme.accent : theme.wire },
+              ]}
+              onPress={() => setTab('note')}
+            >
+              <Text style={[styles.tabButtonText, { color: tab === 'note' ? '#fff' : theme.muted }]}>Note用</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.tabButton,
+                { backgroundColor: tab === 'x' ? theme.accent : theme.wireFill, borderColor: tab === 'x' ? theme.accent : theme.wire },
+              ]}
+              onPress={() => setTab('x')}
+            >
+              <Text style={[styles.tabButtonText, { color: tab === 'x' ? '#fff' : theme.muted }]}>X用</Text>
+            </Pressable>
+          </View>
+          <Pressable onPress={handleDelete} hitSlop={8}>
+            <Text style={[styles.deleteLink, { color: theme.accent }]}>削除</Text>
           </Pressable>
         </View>
 
@@ -139,9 +204,11 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   container: { flex: 1, padding: 16, gap: 10 },
-  tabRow: { flexDirection: 'row', gap: 6 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  tabRow: { flex: 1, flexDirection: 'row', gap: 6 },
   tabButton: { flex: 1, height: 36, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   tabButtonText: { fontSize: 13, fontWeight: '700' },
+  deleteLink: { fontSize: 12, fontWeight: '700' },
   heading: { fontSize: 16, fontWeight: '700', paddingVertical: 4 },
   body: { flex: 1, fontSize: 14, lineHeight: 22, borderWidth: 1, borderRadius: 8, padding: 10, textAlignVertical: 'top' },
   primaryButton: { height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
