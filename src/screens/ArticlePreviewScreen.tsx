@@ -1,5 +1,18 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, ActivityIndicator, Alert } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  SafeAreaView,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  InputAccessoryView,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import type { RootStackScreenProps } from '../navigation/types';
@@ -15,6 +28,8 @@ import {
 
 type Props = RootStackScreenProps<'ArticlePreview'>;
 type Tab = 'note' | 'x';
+
+const KEYBOARD_ACCESSORY_ID = 'articlePreviewKeyboardDone';
 
 export default function ArticlePreviewScreen({ navigation, route }: Props) {
   const theme = useTheme();
@@ -96,8 +111,9 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
         // Xは投稿画面に文面を事前入力した状態で開ける
         await Linking.openURL(`https://x.com/intent/post?text=${encodeURIComponent(body)}`);
       } else {
-        // Noteには下書きを事前入力するAPIがないため、開いた上で手動貼り付けを案内する（§9-1）
-        await Linking.openURL('https://note.com');
+        // Noteには下書きを事前入力するAPIがないため、開いた上で手動貼り付けを案内する（§9-1）。
+        // トップページではなく新規投稿作成画面に直接遷移させ、ログイン済みの場合の手間を1手減らす
+        await Linking.openURL('https://note.com/notes/new');
         Alert.alert('コピーしました', 'Noteを開きました。コピーした内容を貼り付けて投稿してください。');
       }
     } catch {
@@ -144,7 +160,11 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
+      >
         <View style={styles.topRow}>
           <View style={styles.tabRow}>
             <Pressable
@@ -178,6 +198,7 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
             onChangeText={setTitle}
             onEndEditing={() => saveEdits(title, body)}
             multiline
+            inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
           />
         )}
         <TextInput
@@ -186,7 +207,15 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
           onChangeText={setBody}
           onEndEditing={() => saveEdits(title, body)}
           multiline
+          inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
         />
+        <InputAccessoryView nativeID={KEYBOARD_ACCESSORY_ID}>
+          <View style={[styles.keyboardBar, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}>
+            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8}>
+              <Text style={[styles.keyboardBarButton, { color: theme.accent }]}>閉じる</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
 
         <Pressable style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={handleCopy}>
           <Text style={styles.primaryButtonText}>{copied ? 'コピーしました' : 'コピーして開く'}</Text>
@@ -195,7 +224,7 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
         <Pressable onPress={() => navigation.navigate('Main', { screen: 'History' })}>
           <Text style={[styles.link, { color: theme.muted }]}>履歴一覧へ</Text>
         </Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -214,4 +243,6 @@ const styles = StyleSheet.create({
   primaryButton: { height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   link: { textAlign: 'center', fontSize: 12, paddingVertical: 6 },
+  keyboardBar: { flexDirection: 'row', justifyContent: 'flex-end', padding: 8, borderTopWidth: 1 },
+  keyboardBarButton: { fontSize: 14, fontWeight: '700' },
 });
