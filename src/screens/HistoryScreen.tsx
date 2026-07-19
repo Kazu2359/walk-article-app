@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, TextInput, FlatList, ActivityIndicator } from 'react-native';
+import {
+  StyleSheet,
+  Text,
+  View,
+  Pressable,
+  SafeAreaView,
+  TextInput,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from 'react-native';
 import type { MainTabScreenProps } from '../navigation/types';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
@@ -27,29 +37,42 @@ export default function HistoryScreen({ navigation }: Props) {
   const [query, setQuery] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const load = useCallback(
-    (searchQuery: string) => {
+  const fetchRows = useCallback(
+    async (searchQuery: string) => {
       if (!accessToken) return;
-      setIsLoading(true);
-      listRecordings(accessToken, { query: searchQuery || undefined })
-        .then(({ items }) => {
-          const flattened = items.flatMap((item) =>
-            item.articles.map((article) => ({
-              key: `${item.id}-${article.platform}`,
-              recordingId: item.id,
-              platform: article.platform,
-              excerpt: article.excerpt,
-              date: formatDate(item.recordedAt),
-            })),
-          );
-          setRows(flattened);
-        })
-        .catch(() => setRows([]))
-        .finally(() => setIsLoading(false));
+      try {
+        const { items } = await listRecordings(accessToken, { query: searchQuery || undefined });
+        const flattened = items.flatMap((item) =>
+          item.articles.map((article) => ({
+            key: `${item.id}-${article.platform}`,
+            recordingId: item.id,
+            platform: article.platform,
+            excerpt: article.excerpt,
+            date: formatDate(item.recordedAt),
+          })),
+        );
+        setRows(flattened);
+      } catch {
+        setRows([]);
+      }
     },
     [accessToken],
   );
+
+  const load = useCallback(
+    (searchQuery: string) => {
+      setIsLoading(true);
+      fetchRows(searchQuery).finally(() => setIsLoading(false));
+    },
+    [fetchRows],
+  );
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    fetchRows(query).finally(() => setIsRefreshing(false));
+  }, [fetchRows, query]);
 
   useEffect(() => {
     load('');
@@ -84,6 +107,9 @@ export default function HistoryScreen({ navigation }: Props) {
             data={rows}
             keyExtractor={(row) => row.key}
             contentContainerStyle={{ gap: 8 }}
+            refreshControl={
+              <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={theme.accent} />
+            }
             renderItem={({ item }) => (
               <Pressable
                 style={[styles.card, { borderColor: theme.wire }]}
