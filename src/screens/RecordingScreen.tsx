@@ -33,7 +33,11 @@ export default function RecordingScreen({ navigation }: Props) {
   useEffect(() => {
     let isMounted = true;
     (async () => {
-      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
+        allowsBackgroundRecording: true,
+      });
       await recorder.prepareToRecordAsync();
       if (!isMounted) return;
       startedAtRef.current = new Date();
