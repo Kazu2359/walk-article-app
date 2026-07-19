@@ -10,7 +10,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.kazu2359.walkarticleapp",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["audio"]
       }
     },
     "android": {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, Alert, ActivityIndicator, AppState } from 'react-native';
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -26,6 +26,7 @@ export default function RecordingScreen({ navigation }: Props) {
   const [elapsed, setElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startedAtRef = useRef(new Date());
 
@@ -37,6 +38,7 @@ export default function RecordingScreen({ navigation }: Props) {
       if (!isMounted) return;
       startedAtRef.current = new Date();
       recorder.record();
+      setHasStarted(true);
     })();
     return () => {
       isMounted = false;
@@ -44,13 +46,26 @@ export default function RecordingScreen({ navigation }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 電話着信などでシステムに録音を中断された場合（isPausedを自分では立てていないのにisRecordingがfalseになる）、
+  // アプリがフォアグラウンドに戻ったタイミングで自動再開を試みる
+  const isInterrupted = hasStarted && !isPaused && !isUploading && !recorderState.isRecording;
+
   useEffect(() => {
-    if (isPaused || isUploading) return;
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && isInterrupted) {
+        recorder.record();
+      }
+    });
+    return () => subscription.remove();
+  }, [isInterrupted, recorder]);
+
+  useEffect(() => {
+    if (isPaused || isUploading || !recorderState.isRecording) return;
     intervalRef.current = setInterval(() => setElapsed((prev) => prev + 1), 1000);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPaused, isUploading]);
+  }, [isPaused, isUploading, recorderState.isRecording]);
 
   const handleTogglePause = () => {
     if (isPaused) {
@@ -139,7 +154,11 @@ export default function RecordingScreen({ navigation }: Props) {
 
         <View style={[styles.note, { borderColor: theme.wire }]}>
           <Text style={[styles.noteText, { color: theme.muted }]}>
-            {isPaused ? '一時停止中です' : 'ロックしても録音は続きます'}
+            {isPaused
+              ? '一時停止中です'
+              : isInterrupted
+                ? '電話などで録音が中断されています。通話が終わると自動で再開します'
+                : 'ロックしても録音は続きます'}
           </Text>
         </View>
       </View>
