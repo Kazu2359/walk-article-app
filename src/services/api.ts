@@ -2,7 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 
 // 開発中はシミュレータならlocalhostでよいが、実機（Expo Go/開発ビルド）からは
 // PCのLAN IPやトンネルURLに到達できる必要がある。EXPO_PUBLIC_API_BASE_URLで上書きする。
-const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+export const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
 
 const ACCESS_TOKEN_KEY = 'walkArticle.accessToken';
 

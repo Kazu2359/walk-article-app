@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Platform, Alert } from 'react-native';
+import { StyleSheet, Text, View, Pressable, SafeAreaView, Platform, Alert, Linking } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
-import { ApiError } from '../services/api';
+import { ApiError, BASE_URL } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -76,7 +76,11 @@ export default function LoginScreen({ navigation }: Props) {
 
         {isSigningIn && <Text style={[styles.terms, { color: theme.muted }]}>サインイン中…</Text>}
 
-        <Text style={[styles.terms, { color: theme.muted }]}>利用規約・プライバシーポリシー</Text>
+        <Pressable onPress={() => Linking.openURL(`${BASE_URL}/privacy`)}>
+          <Text style={[styles.terms, { color: theme.muted, textDecorationLine: 'underline' }]}>
+            プライバシーポリシー
+          </Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
