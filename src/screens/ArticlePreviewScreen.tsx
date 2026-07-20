@@ -42,6 +42,8 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [copied, setCopied] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -75,22 +77,28 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
     }
   }, [articles, tab, navigation]);
 
-  const saveEdits = useCallback(
-    async (nextTitle: string, nextBody: string) => {
-      const current = articles?.[tab];
-      if (!accessToken || !current) return;
-      try {
-        const updated = await updateArticle(accessToken, current.id, {
-          editedBody: nextBody,
-          ...(current.platform === 'note' ? { editedTitle: nextTitle } : {}),
-        });
-        setArticles((prev) => (prev ? { ...prev, [tab]: updated } : prev));
-      } catch {
-        // 編集の保存に失敗しても画面上のテキストはそのまま残す
-      }
-    },
-    [accessToken, articles, tab],
-  );
+  const handleSave = useCallback(async () => {
+    const current = articles?.[tab];
+    if (!accessToken || !current) return;
+    if (body.trim().length === 0) {
+      Alert.alert('本文を入力してください');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const updated = await updateArticle(accessToken, current.id, {
+        editedBody: body,
+        ...(current.platform === 'note' ? { editedTitle: title } : {}),
+      });
+      setArticles((prev) => (prev ? { ...prev, [tab]: updated } : prev));
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch {
+      Alert.alert('保存に失敗しました', 'しばらくしてからもう一度お試しください。');
+    } finally {
+      setIsSaving(false);
+    }
+  }, [accessToken, articles, tab, title, body]);
 
   const handleCopy = async () => {
     const current = articles?.[tab];
@@ -196,7 +204,6 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
             style={[styles.heading, { color: theme.ink }]}
             value={title}
             onChangeText={setTitle}
-            onEndEditing={() => saveEdits(title, body)}
             multiline
             inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
           />
@@ -205,10 +212,21 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
           style={[styles.body, { color: theme.ink, borderColor: theme.line }]}
           value={body}
           onChangeText={setBody}
-          onEndEditing={() => saveEdits(title, body)}
           multiline
           inputAccessoryViewID={KEYBOARD_ACCESSORY_ID}
         />
+
+        <PressableOpacity
+          style={[styles.saveButton, { borderColor: theme.accent }]}
+          onPress={handleSave}
+          disabled={isSaving}
+        >
+          {isSaving ? (
+            <ActivityIndicator size="small" color={theme.accent} />
+          ) : (
+            <Text style={[styles.saveButtonText, { color: theme.accent }]}>{saved ? '保存しました' : '保存する'}</Text>
+          )}
+        </PressableOpacity>
         <InputAccessoryView nativeID={KEYBOARD_ACCESSORY_ID}>
           <View style={[styles.keyboardBar, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}>
             <PressableOpacity onPress={() => Keyboard.dismiss()} hitSlop={8}>
@@ -240,6 +258,8 @@ const styles = StyleSheet.create({
   deleteLink: { fontSize: 12, fontWeight: '700' },
   heading: { fontSize: 16, fontWeight: '700', paddingVertical: 4 },
   body: { flex: 1, fontSize: 14, lineHeight: 22, borderWidth: 1, borderRadius: 8, padding: 10, textAlignVertical: 'top' },
+  saveButton: { height: 40, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  saveButtonText: { fontSize: 13, fontWeight: '700' },
   primaryButton: { height: 46, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   primaryButtonText: { color: '#fff', fontSize: 14, fontWeight: '700' },
   link: { textAlign: 'center', fontSize: 12, paddingVertical: 6 },
