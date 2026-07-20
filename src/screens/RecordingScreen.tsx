@@ -25,7 +25,9 @@ const BAR_HEIGHTS = [14, 28, 10, 36, 20, 30, 16, 24];
 export default function RecordingScreen({ navigation }: Props) {
   const theme = useTheme();
   const { accessToken } = useAuth();
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  // 音楽ではなく音声（Whisper文字起こし用途）のため、HIGH_QUALITY（128kbps）ではなく
+  // LOW_QUALITY（64kbps）で十分。30分録音時のファイルサイズをおよそ半分に抑えられる
+  const recorder = useAudioRecorder(RecordingPresets.LOW_QUALITY);
   const recorderState = useAudioRecorderState(recorder);
   const [elapsed, setElapsed] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
