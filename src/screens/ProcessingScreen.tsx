@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import { getRecordingStatus, type RecordingStatus } from '../services/api';
@@ -106,21 +107,21 @@ export default function ProcessingScreen({ navigation, route }: Props) {
         </View>
 
         {isDone && (
-          <Pressable
+          <PressableOpacity
             style={[styles.primaryButton, { backgroundColor: theme.accent }]}
             onPress={() => navigation.replace('ArticlePreview', { recordingId })}
           >
             <Text style={styles.primaryButtonText}>記事を確認する</Text>
-          </Pressable>
+          </PressableOpacity>
         )}
 
         {isFailed && (
-          <Pressable
+          <PressableOpacity
             style={[styles.primaryButton, { backgroundColor: theme.accent }]}
             onPress={() => navigation.replace('Main', { screen: 'Home' })}
           >
             <Text style={styles.primaryButtonText}>ホームに戻る</Text>
-          </Pressable>
+          </PressableOpacity>
         )}
       </View>
     </SafeAreaView>

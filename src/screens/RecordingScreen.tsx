@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Alert, ActivityIndicator, AppState } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, Alert, ActivityIndicator, AppState } from 'react-native';
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { File } from 'expo-file-system';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import { completeUpload, createRecording, uploadAudioToStorage } from '../services/api';
@@ -160,9 +161,9 @@ export default function RecordingScreen({ navigation }: Props) {
         </View>
 
         {!isUploading && (
-          <Pressable style={styles.cancelLink} onPress={handleCancel} hitSlop={8}>
+          <PressableOpacity style={styles.cancelLink} onPress={handleCancel} hitSlop={8}>
             <Text style={[styles.cancelLinkText, { color: theme.muted }]}>破棄</Text>
-          </Pressable>
+          </PressableOpacity>
         )}
 
         <Text style={[styles.timer, { color: theme.ink }]}>{formatElapsed(elapsed)}</Text>
@@ -186,20 +187,20 @@ export default function RecordingScreen({ navigation }: Props) {
           </View>
         ) : (
           <View style={styles.controls}>
-            <Pressable
+            <PressableOpacity
               style={[styles.circleButton, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}
               onPress={handleTogglePause}
             >
               <Text style={[styles.circleButtonText, { color: theme.muted }]}>
                 {isPaused ? '再開' : '一時停止'}
               </Text>
-            </Pressable>
-            <Pressable
+            </PressableOpacity>
+            <PressableOpacity
               style={[styles.circleButton, { backgroundColor: theme.accent, borderColor: theme.accent }]}
               onPress={handleStop}
             >
               <Text style={[styles.circleButtonText, { color: '#fff' }]}>停止</Text>
-            </Pressable>
+            </PressableOpacity>
           </View>
         )}
 

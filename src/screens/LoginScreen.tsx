@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Platform, Alert, Linking } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, Platform, Alert, Linking } from 'react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import { ApiError, BASE_URL } from '../services/api';
@@ -69,18 +70,18 @@ export default function LoginScreen({ navigation }: Props) {
             onPress={handleSignIn}
           />
         ) : (
-          <Pressable style={[styles.fallbackButton, { backgroundColor: theme.ink }]} onPress={handleSignIn}>
+          <PressableOpacity style={[styles.fallbackButton, { backgroundColor: theme.ink }]} onPress={handleSignIn}>
             <Text style={styles.fallbackButtonText}>Appleでサインイン</Text>
-          </Pressable>
+          </PressableOpacity>
         )}
 
         {isSigningIn && <Text style={[styles.terms, { color: theme.muted }]}>サインイン中…</Text>}
 
-        <Pressable onPress={() => Linking.openURL(`${BASE_URL}/privacy`)}>
+        <PressableOpacity onPress={() => Linking.openURL(`${BASE_URL}/privacy`)}>
           <Text style={[styles.terms, { color: theme.muted, textDecorationLine: 'underline' }]}>
             プライバシーポリシー
           </Text>
-        </Pressable>
+        </PressableOpacity>
       </View>
     </SafeAreaView>
   );

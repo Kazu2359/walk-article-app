@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Text,
   View,
-  Pressable,
   SafeAreaView,
   TextInput,
   FlatList,
@@ -11,6 +10,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import type { MainTabScreenProps } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import { listRecordings, type ArticlePlatform } from '../services/api';
@@ -102,16 +102,16 @@ export default function HistoryScreen({ navigation }: Props) {
         ) : hasError ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: theme.muted }]}>読み込みに失敗しました</Text>
-            <Pressable onPress={() => load(query)}>
+            <PressableOpacity onPress={() => load(query)}>
               <Text style={[styles.emptyLink, { color: theme.accent }]}>もう一度試す</Text>
-            </Pressable>
+            </PressableOpacity>
           </View>
         ) : rows.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={[styles.emptyText, { color: theme.muted }]}>まだ記事がありません</Text>
-            <Pressable onPress={() => navigation.navigate('Home')}>
+            <PressableOpacity onPress={() => navigation.navigate('Home')}>
               <Text style={[styles.emptyLink, { color: theme.accent }]}>最初の録音をしてみましょう</Text>
-            </Pressable>
+            </PressableOpacity>
           </View>
         ) : (
           <FlatList
@@ -122,7 +122,7 @@ export default function HistoryScreen({ navigation }: Props) {
               <RefreshControl refreshing={isRefreshing} onRefresh={handleRefresh} tintColor={theme.accent} />
             }
             renderItem={({ item }) => (
-              <Pressable
+              <PressableOpacity
                 style={[styles.card, { borderColor: theme.wire }]}
                 onPress={() => navigation.navigate('ArticlePreview', { recordingId: item.recordingId })}
               >
@@ -142,7 +142,7 @@ export default function HistoryScreen({ navigation }: Props) {
                   </Text>
                   <Text style={[styles.cardDate, { color: theme.muted }]}>{item.date}</Text>
                 </View>
-              </Pressable>
+              </PressableOpacity>
             )}
           />
         )}

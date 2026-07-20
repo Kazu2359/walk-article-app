@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView, Switch, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, Switch, ActivityIndicator, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainTabScreenProps, RootStackParamList } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import { deleteAccount, getSettings, registerPushToken, updateSettings, type Tone } from '../services/api';
@@ -144,7 +145,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <Text style={[styles.sectionLabel, { color: theme.muted }]}>文体トーン</Text>
         <View style={styles.toneRow}>
           {TONE_OPTIONS.map((option) => (
-            <Pressable
+            <PressableOpacity
               key={option.value}
               style={[
                 styles.toneOption,
@@ -158,17 +159,17 @@ export default function SettingsScreen({ navigation }: Props) {
               <Text style={[styles.toneOptionText, { color: tone === option.value ? '#fff' : theme.muted }]}>
                 {option.label}
               </Text>
-            </Pressable>
+            </PressableOpacity>
           ))}
         </View>
 
         <View style={styles.spacer} />
 
-        <Pressable style={[styles.logoutRow, { borderColor: theme.wire }]} onPress={handleLogout}>
+        <PressableOpacity style={[styles.logoutRow, { borderColor: theme.wire }]} onPress={handleLogout}>
           <Text style={[styles.logoutText, { color: theme.muted }]}>ログアウト</Text>
-        </Pressable>
+        </PressableOpacity>
 
-        <Pressable
+        <PressableOpacity
           style={[styles.deleteRow, { borderColor: theme.wire }]}
           onPress={handleDeleteAccount}
           disabled={isDeleting}
@@ -178,7 +179,7 @@ export default function SettingsScreen({ navigation }: Props) {
           ) : (
             <Text style={[styles.deleteText, { color: theme.accent }]}>アカウントを削除</Text>
           )}
-        </Pressable>
+        </PressableOpacity>
       </View>
     </SafeAreaView>
   );

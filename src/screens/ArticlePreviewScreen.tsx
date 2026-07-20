@@ -3,7 +3,6 @@ import {
   StyleSheet,
   Text,
   View,
-  Pressable,
   SafeAreaView,
   TextInput,
   ActivityIndicator,
@@ -16,6 +15,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import type { RootStackScreenProps } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import {
@@ -167,7 +167,7 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
       >
         <View style={styles.topRow}>
           <View style={styles.tabRow}>
-            <Pressable
+            <PressableOpacity
               style={[
                 styles.tabButton,
                 { backgroundColor: tab === 'note' ? theme.accent : theme.wireFill, borderColor: tab === 'note' ? theme.accent : theme.wire },
@@ -175,8 +175,8 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
               onPress={() => setTab('note')}
             >
               <Text style={[styles.tabButtonText, { color: tab === 'note' ? '#fff' : theme.muted }]}>Note用</Text>
-            </Pressable>
-            <Pressable
+            </PressableOpacity>
+            <PressableOpacity
               style={[
                 styles.tabButton,
                 { backgroundColor: tab === 'x' ? theme.accent : theme.wireFill, borderColor: tab === 'x' ? theme.accent : theme.wire },
@@ -184,11 +184,11 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
               onPress={() => setTab('x')}
             >
               <Text style={[styles.tabButtonText, { color: tab === 'x' ? '#fff' : theme.muted }]}>X用</Text>
-            </Pressable>
+            </PressableOpacity>
           </View>
-          <Pressable onPress={handleDelete} hitSlop={8}>
+          <PressableOpacity onPress={handleDelete} hitSlop={8}>
             <Text style={[styles.deleteLink, { color: theme.accent }]}>削除</Text>
-          </Pressable>
+          </PressableOpacity>
         </View>
 
         {tab === 'note' && (
@@ -211,19 +211,19 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
         />
         <InputAccessoryView nativeID={KEYBOARD_ACCESSORY_ID}>
           <View style={[styles.keyboardBar, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}>
-            <Pressable onPress={() => Keyboard.dismiss()} hitSlop={8}>
+            <PressableOpacity onPress={() => Keyboard.dismiss()} hitSlop={8}>
               <Text style={[styles.keyboardBarButton, { color: theme.accent }]}>閉じる</Text>
-            </Pressable>
+            </PressableOpacity>
           </View>
         </InputAccessoryView>
 
-        <Pressable style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={handleCopy}>
+        <PressableOpacity style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={handleCopy}>
           <Text style={styles.primaryButtonText}>{copied ? 'コピーしました' : 'コピーして開く'}</Text>
-        </Pressable>
+        </PressableOpacity>
 
-        <Pressable onPress={() => navigation.navigate('Main', { screen: 'History' })}>
+        <PressableOpacity onPress={() => navigation.navigate('Main', { screen: 'History' })}>
           <Text style={[styles.link, { color: theme.muted }]}>履歴一覧へ</Text>
-        </Pressable>
+        </PressableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

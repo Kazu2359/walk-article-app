@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView } from 'react-native';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
 import * as Notifications from 'expo-notifications';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
@@ -32,7 +33,7 @@ export default function OnboardingScreen({ navigation }: Props) {
           歩きながら話すだけで、記事になる
         </Text>
 
-        <Pressable
+        <PressableOpacity
           style={[styles.permissionRow, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}
           onPress={handleRequestMic}
         >
@@ -41,9 +42,9 @@ export default function OnboardingScreen({ navigation }: Props) {
           <Text style={[styles.permissionStatus, { color: micGranted ? theme.accent : theme.muted }]}>
             {micGranted ? '許可済み' : '未許可'}
           </Text>
-        </Pressable>
+        </PressableOpacity>
 
-        <Pressable
+        <PressableOpacity
           style={[styles.permissionRow, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}
           onPress={handleRequestNotifications}
         >
@@ -52,14 +53,14 @@ export default function OnboardingScreen({ navigation }: Props) {
           <Text style={[styles.permissionStatus, { color: notificationGranted ? theme.accent : theme.muted }]}>
             {notificationGranted === null ? '未許可' : notificationGranted ? '許可済み' : '拒否'}
           </Text>
-        </Pressable>
+        </PressableOpacity>
 
-        <Pressable
+        <PressableOpacity
           style={[styles.primaryButton, { backgroundColor: theme.accent }]}
           onPress={() => navigation.navigate('Login')}
         >
           <Text style={styles.primaryButtonText}>はじめる</Text>
-        </Pressable>
+        </PressableOpacity>
       </View>
     </SafeAreaView>
   );

@@ -1,7 +1,8 @@
 import { useCallback, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, SafeAreaView } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { MainTabScreenProps } from '../navigation/types';
+import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import { listRecordings, type HistoryItem } from '../services/api';
@@ -39,16 +40,16 @@ export default function HomeScreen({ navigation }: Props) {
       </View>
 
       <View style={styles.center}>
-        <Pressable
+        <PressableOpacity
           style={[styles.recordButton, { backgroundColor: theme.accentDim, borderColor: theme.accent }]}
           onPress={() => navigation.navigate('Recording')}
         >
           <Text style={styles.recordIcon}>●</Text>
-        </Pressable>
+        </PressableOpacity>
         <Text style={[styles.recordHint, { color: theme.muted }]}>タップで録音開始</Text>
       </View>
 
-      <Pressable
+      <PressableOpacity
         style={[styles.recentCard, { borderColor: theme.wire }]}
         disabled={!recent}
         onPress={() => recent && navigation.navigate('ArticlePreview', { recordingId: recent.id })}
@@ -57,7 +58,7 @@ export default function HomeScreen({ navigation }: Props) {
         <Text style={[styles.recentText, { color: theme.muted }]} numberOfLines={1}>
           {recentCardText}
         </Text>
-      </Pressable>
+      </PressableOpacity>
     </SafeAreaView>
   );
 }
