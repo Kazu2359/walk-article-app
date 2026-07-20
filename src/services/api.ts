@@ -144,7 +144,7 @@ export interface HistoryItem {
   id: string;
   recordedAt: string;
   status: RecordingStatus;
-  articles: Array<{ platform: ArticlePlatform; excerpt: string }>;
+  articles: Array<{ platform: ArticlePlatform; title: string | null; excerpt: string }>;
 }
 
 export function listRecordings(
