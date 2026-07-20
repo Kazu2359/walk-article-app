@@ -38,6 +38,7 @@ export default function HistoryScreen({ navigation }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const fetchRows = useCallback(
     async (searchQuery: string) => {
@@ -54,8 +55,11 @@ export default function HistoryScreen({ navigation }: Props) {
           })),
         );
         setRows(flattened);
+        setHasError(false);
       } catch {
+        // 空データとの区別のため、通信エラー時はrowsをクリアしてエラー状態を表示する
         setRows([]);
+        setHasError(true);
       }
     },
     [accessToken],
@@ -94,6 +98,13 @@ export default function HistoryScreen({ navigation }: Props) {
         {isLoading ? (
           <View style={styles.emptyState}>
             <ActivityIndicator size="large" color={theme.accent} />
+          </View>
+        ) : hasError ? (
+          <View style={styles.emptyState}>
+            <Text style={[styles.emptyText, { color: theme.muted }]}>読み込みに失敗しました</Text>
+            <Pressable onPress={() => load(query)}>
+              <Text style={[styles.emptyLink, { color: theme.accent }]}>もう一度試す</Text>
+            </Pressable>
           </View>
         ) : rows.length === 0 ? (
           <View style={styles.emptyState}>

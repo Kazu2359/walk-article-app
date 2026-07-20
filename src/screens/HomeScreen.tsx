@@ -12,17 +12,25 @@ export default function HomeScreen({ navigation }: Props) {
   const theme = useTheme();
   const { accessToken } = useAuth();
   const [recent, setRecent] = useState<HistoryItem | null>(null);
+  const [hasError, setHasError] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       if (!accessToken) return;
       listRecordings(accessToken, { limit: 1 })
-        .then(({ items }) => setRecent(items[0] ?? null))
-        .catch(() => setRecent(null));
+        .then(({ items }) => {
+          setRecent(items[0] ?? null);
+          setHasError(false);
+        })
+        .catch(() => {
+          setRecent(null);
+          setHasError(true);
+        });
     }, [accessToken]),
   );
 
   const excerpt = recent?.articles[0]?.excerpt;
+  const recentCardText = excerpt ?? (hasError ? '読み込みに失敗しました' : 'まだ記事がありません');
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
@@ -47,7 +55,7 @@ export default function HomeScreen({ navigation }: Props) {
       >
         <View style={[styles.recentThumb, { backgroundColor: theme.wireFill2, borderColor: theme.wire }]} />
         <Text style={[styles.recentText, { color: theme.muted }]} numberOfLines={1}>
-          {excerpt ?? 'まだ記事がありません'}
+          {recentCardText}
         </Text>
       </Pressable>
     </SafeAreaView>
