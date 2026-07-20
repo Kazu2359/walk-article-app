@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, View, Pressable, SafeAreaView, Alert, ActivityIndicator, AppState } from 'react-native';
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets, setAudioModeAsync } from 'expo-audio';
+import { File } from 'expo-file-system';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useTheme } from '../constants/theme';
@@ -8,6 +9,9 @@ import { useAuth } from '../hooks/AuthContext';
 import { completeUpload, createRecording, uploadAudioToStorage } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Recording'>;
+
+// 要件定義書§10の上限（バックエンドのバリデーションと合わせる）
+const MAX_DURATION_SECONDS = 30 * 60;
 
 function formatElapsed(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
@@ -111,12 +115,53 @@ export default function RecordingScreen({ navigation }: Props) {
     }
   };
 
+  // §10の上限（30分）に達したら自動停止する
+  useEffect(() => {
+    if (elapsed >= MAX_DURATION_SECONDS && !isUploading) {
+      handleStop();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [elapsed]);
+
+  const handleCancel = () => {
+    if (isUploading) return;
+    Alert.alert('録音を破棄しますか？', 'この操作は取り消せません。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '破棄する',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await recorder.stop();
+          } catch {
+            // すでに停止している場合等は無視
+          }
+          const uri = recorder.uri;
+          if (uri) {
+            try {
+              new File(uri).delete();
+            } catch {
+              // ファイルが既に存在しない場合等は無視
+            }
+          }
+          navigation.goBack();
+        },
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
       <View style={styles.container}>
         <View style={[styles.recBadge, { backgroundColor: theme.accentDim }]}>
           <Text style={[styles.recBadgeText, { color: theme.accent }]}>● REC</Text>
         </View>
+
+        {!isUploading && (
+          <Pressable style={styles.cancelLink} onPress={handleCancel} hitSlop={8}>
+            <Text style={[styles.cancelLinkText, { color: theme.muted }]}>破棄</Text>
+          </Pressable>
+        )}
 
         <Text style={[styles.timer, { color: theme.ink }]}>{formatElapsed(elapsed)}</Text>
 
@@ -175,6 +220,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 20, paddingHorizontal: 24 },
   recBadge: { position: 'absolute', top: 16, left: 16, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4 },
   recBadgeText: { fontSize: 10, fontWeight: '800' },
+  cancelLink: { position: 'absolute', top: 20, right: 16 },
+  cancelLinkText: { fontSize: 12, fontWeight: '700' },
   timer: { fontSize: 32, fontWeight: '700', fontVariant: ['tabular-nums'] },
   meter: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, height: 40 },
   meterBar: { width: 4, borderRadius: 2 },
