@@ -92,7 +92,10 @@ export default function RecordingScreen({ navigation }: Props) {
     if (isUploading || !accessToken) return;
     setIsUploading(true);
     try {
-      await recorder.stop();
+      // 電話等の中断で既に録音が停止している場合、stop()を再度呼ぶとネイティブ側でエラーになるため呼ばない
+      if (recorderState.isRecording) {
+        await recorder.stop();
+      }
       const uri = recorder.uri;
       if (!uri) {
         throw new Error('録音ファイルの取得に失敗しました');
