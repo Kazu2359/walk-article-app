@@ -12,16 +12,29 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Onboarding'>;
 export default function OnboardingScreen({ navigation }: Props) {
   const theme = useTheme();
   const [micGranted, setMicGranted] = useState(false);
+  const [micRequested, setMicRequested] = useState(false);
   const [notificationGranted, setNotificationGranted] = useState<boolean | null>(null);
+  const [aiConsent, setAiConsent] = useState(false);
 
   const handleRequestMic = async () => {
     const { granted } = await requestRecordingPermissionsAsync();
     setMicGranted(granted);
+    setMicRequested(true);
+    return granted;
   };
 
   const handleRequestNotifications = async () => {
     const { status } = await Notifications.requestPermissionsAsync();
     setNotificationGranted(status === 'granted');
+  };
+
+  const handleStart = async () => {
+    // マイクの許可ダイアログは、このメッセージ画面をスキップして必ず表示させる
+    // （Apple Guideline 5.1.1(iv)対応: 権限リクエストを迂回・遅延させない）
+    if (!micRequested) {
+      await handleRequestMic();
+    }
+    navigation.navigate('Login');
   };
 
   return (
@@ -56,8 +69,21 @@ export default function OnboardingScreen({ navigation }: Props) {
         </PressableOpacity>
 
         <PressableOpacity
-          style={[styles.primaryButton, { backgroundColor: theme.accent }]}
-          onPress={() => navigation.navigate('Login')}
+          style={[styles.consentCard, { backgroundColor: theme.wireFill, borderColor: theme.wire }]}
+          onPress={() => setAiConsent((prev) => !prev)}
+        >
+          <View style={[styles.checkbox, { borderColor: theme.wire }, aiConsent && { backgroundColor: theme.accent, borderColor: theme.accent }]}>
+            {aiConsent && <Text style={styles.checkboxMark}>✓</Text>}
+          </View>
+          <Text style={[styles.consentText, { color: theme.ink }]}>
+            録音した音声はOpenAI（文字起こし）・Anthropic（記事生成）に送信され、処理に利用されます。内容に同意します。
+          </Text>
+        </PressableOpacity>
+
+        <PressableOpacity
+          style={[styles.primaryButton, { backgroundColor: theme.accent }, !aiConsent && styles.primaryButtonDisabled]}
+          onPress={handleStart}
+          disabled={!aiConsent}
         >
           <Text style={styles.primaryButtonText}>はじめる</Text>
         </PressableOpacity>
@@ -84,6 +110,27 @@ const styles = StyleSheet.create({
   permissionIcon: { fontSize: 18 },
   permissionLabel: { flex: 1, fontSize: 13, fontWeight: '600' },
   permissionStatus: { fontSize: 11, fontWeight: '700' },
+  consentCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginTop: 4,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  checkboxMark: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  consentText: { flex: 1, fontSize: 11.5, lineHeight: 16 },
   primaryButton: {
     marginTop: 24,
     height: 48,
@@ -91,5 +138,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  primaryButtonDisabled: { opacity: 0.4 },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '700' },
 });
