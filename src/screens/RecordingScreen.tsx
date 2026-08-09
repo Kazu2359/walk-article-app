@@ -14,6 +14,19 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Recording'>;
 // 要件定義書§10の上限（バックエンドのバリデーションと合わせる）
 const MAX_DURATION_SECONDS = 30 * 60;
 
+// バックエンドはコスト削減のためアイドル時に停止する構成（min_machines_running: 0）。
+// 録音中はAPIに一切リクエストが飛ばないため、録音が長いほどサーバーが休止している確率が上がり、
+// 停止直後の最初のリクエストがまれに失敗する（Fly側のwake-upが間に合わない）。
+// そのため一度だけ短い間隔を空けてリトライする
+async function withWakeUpRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (error) {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    return fn();
+  }
+}
+
 function formatElapsed(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
@@ -103,14 +116,16 @@ export default function RecordingScreen({ navigation }: Props) {
 
       const audio = await (await fetch(uri)).blob();
 
-      const { recordingId, uploadUrl } = await createRecording(accessToken, {
-        durationSeconds: Math.max(elapsed, 1),
-        fileSizeBytes: audio.size,
-        recordedAt: startedAtRef.current.toISOString(),
-      });
+      const { recordingId, uploadUrl } = await withWakeUpRetry(() =>
+        createRecording(accessToken, {
+          durationSeconds: Math.max(elapsed, 1),
+          fileSizeBytes: audio.size,
+          recordedAt: startedAtRef.current.toISOString(),
+        }),
+      );
 
       await uploadAudioToStorage(uploadUrl, audio);
-      await completeUpload(accessToken, recordingId);
+      await withWakeUpRetry(() => completeUpload(accessToken, recordingId));
 
       navigation.replace('Processing', { recordingId });
     } catch (error) {
