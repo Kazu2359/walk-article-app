@@ -57,7 +57,7 @@ export default function LoginScreen({ navigation }: Props) {
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
       <View style={styles.container}>
         <View style={[styles.logo, { backgroundColor: theme.wireFill, borderColor: theme.wire }]} />
-        <Text style={[styles.title, { color: theme.ink }]}>散歩記事化アプリ</Text>
+        <Text style={[styles.title, { color: theme.ink }]}>さんぽライター</Text>
 
         <View style={styles.spacer} />
 
