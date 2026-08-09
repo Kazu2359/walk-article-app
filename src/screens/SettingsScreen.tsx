@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, SafeAreaView, Switch, ActivityIndicator, Alert } from 'react-native';
+import { StyleSheet, Text, View, SafeAreaView, Switch, ActivityIndicator, Alert, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import * as AuthSession from 'expo-auth-session';
 import Constants from 'expo-constants';
+import { Ionicons } from '@expo/vector-icons';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainTabScreenProps, RootStackParamList } from '../navigation/types';
 import PressableOpacity from '../components/PressableOpacity';
@@ -36,6 +37,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const { accessToken, signOut } = useAuth();
   const [xConnected, setXConnected] = useState(false);
   const [isConnectingX, setIsConnectingX] = useState(false);
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [autoPost, setAutoPost] = useState(false);
   const [tone, setTone] = useState<Tone>('casual');
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +69,10 @@ export default function SettingsScreen({ navigation }: Props) {
   useEffect(() => {
     if (!accessToken) return;
     getMe(accessToken)
-      .then((me) => setXConnected(me.xConnected))
+      .then((me) => {
+        setXConnected(me.xConnected);
+        setDisplayName(me.displayName);
+      })
       .catch(() => {
         // 取得失敗時は未連携として表示する
       });
@@ -190,109 +195,144 @@ export default function SettingsScreen({ navigation }: Props) {
     );
   }
 
+  const initial = displayName?.trim()?.charAt(0)?.toUpperCase() || null;
+
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
       <View style={styles.container}>
-        <View style={[styles.accountRow, { borderColor: theme.wire }]}>
-          <View style={[styles.avatar, { backgroundColor: theme.wireFill }]} />
-          <Text style={[styles.accountText, { color: theme.ink }]}>Apple IDでログイン中</Text>
-        </View>
+        <Text style={[styles.pageTitle, { color: theme.ink }]}>設定</Text>
 
-        <View style={styles.xConnectRow}>
-          <View>
-            <Text style={[styles.toggleLabel, { color: theme.ink }]}>X連携</Text>
-            <Text style={[styles.xConnectStatus, { color: theme.muted }]}>
-              {xConnected ? '連携済み' : '未連携'}
-            </Text>
-          </View>
-          <PressableOpacity
-            style={[styles.xConnectButton, { borderColor: theme.accent }]}
-            onPress={xConnected ? handleDisconnectX : handleConnectX}
-            disabled={isConnectingX || (!xConnected && !xAuthRequest)}
-          >
-            {isConnectingX ? (
-              <ActivityIndicator size="small" color={theme.accent} />
+        <View style={[styles.accountRow, { backgroundColor: theme.panel }, cardShadow]}>
+          <View style={[styles.avatar, { backgroundColor: theme.accent }]}>
+            {initial ? (
+              <Text style={styles.avatarText}>{initial}</Text>
             ) : (
-              <Text style={[styles.xConnectButtonText, { color: theme.accent }]}>
-                {xConnected ? '解除する' : '連携する'}
-              </Text>
+              <Ionicons name="person" size={18} color="#fff" />
             )}
-          </PressableOpacity>
+          </View>
+          <View>
+            <Text style={[styles.accountText, { color: theme.ink }]}>Apple IDでログイン中</Text>
+            {displayName ? <Text style={[styles.accountSub, { color: theme.muted }]}>{displayName}</Text> : null}
+          </View>
         </View>
 
-        <View style={styles.toggleRow}>
-          <Text style={[styles.toggleLabel, { color: theme.ink }]}>自動投稿（X限定）</Text>
-          <Switch
-            value={autoPost}
-            onValueChange={handleToggleAutoPost}
-            disabled={!xConnected}
-            trackColor={{ true: theme.accent }}
-          />
-        </View>
-
-        <Text style={[styles.sectionLabel, { color: theme.muted }]}>文体トーン</Text>
-        <View style={styles.toneRow}>
-          {TONE_OPTIONS.map((option) => (
+        <Text style={[styles.groupLabel, { color: theme.muted }]}>X連携</Text>
+        <View style={[styles.group, { backgroundColor: theme.panel }, cardShadow]}>
+          <View style={styles.row}>
+            <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
+              <Ionicons name="at" size={15} color={theme.accent} />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowTitle, { color: theme.ink }]}>Xアカウント</Text>
+              <Text style={[styles.rowSub, { color: theme.muted }]}>{xConnected ? '連携済み' : '未連携'}</Text>
+            </View>
             <PressableOpacity
-              key={option.value}
-              style={[
-                styles.toneOption,
-                {
-                  backgroundColor: tone === option.value ? theme.accent : theme.wireFill,
-                  borderColor: tone === option.value ? theme.accent : theme.wire,
-                },
-              ]}
-              onPress={() => handleSelectTone(option.value)}
+              style={[styles.xConnectButton, { borderColor: theme.accent }]}
+              onPress={xConnected ? handleDisconnectX : handleConnectX}
+              disabled={isConnectingX || (!xConnected && !xAuthRequest)}
             >
-              <Text style={[styles.toneOptionText, { color: tone === option.value ? '#fff' : theme.muted }]}>
-                {option.label}
-              </Text>
+              {isConnectingX ? (
+                <ActivityIndicator size="small" color={theme.accent} />
+              ) : (
+                <Text style={[styles.xConnectButtonText, { color: theme.accent }]}>
+                  {xConnected ? '解除する' : '連携する'}
+                </Text>
+              )}
             </PressableOpacity>
-          ))}
+          </View>
+          <View style={[styles.row, { borderTopWidth: 1, borderTopColor: theme.line }]}>
+            <View style={[styles.rowIcon, { backgroundColor: theme.accentDim }]}>
+              <Ionicons name="flash-outline" size={15} color={theme.accent} />
+            </View>
+            <View style={styles.rowCopy}>
+              <Text style={[styles.rowTitle, { color: theme.ink }]}>自動投稿</Text>
+              <Text style={[styles.rowSub, { color: theme.muted }]}>記事生成後に自動でXへ投稿</Text>
+            </View>
+            <Switch
+              value={autoPost}
+              onValueChange={handleToggleAutoPost}
+              disabled={!xConnected}
+              trackColor={{ true: theme.accent }}
+            />
+          </View>
+        </View>
+
+        <Text style={[styles.groupLabel, { color: theme.muted }]}>文体トーン</Text>
+        <View style={[styles.group, styles.toneGroup, { backgroundColor: theme.panel }, cardShadow]}>
+          <View style={styles.toneRow}>
+            {TONE_OPTIONS.map((option) => (
+              <PressableOpacity
+                key={option.value}
+                style={[
+                  styles.toneOption,
+                  { backgroundColor: tone === option.value ? theme.accent : theme.wireFill },
+                ]}
+                onPress={() => handleSelectTone(option.value)}
+              >
+                <Text style={[styles.toneOptionText, { color: tone === option.value ? '#fff' : theme.muted }]}>
+                  {option.label}
+                </Text>
+              </PressableOpacity>
+            ))}
+          </View>
         </View>
 
         <View style={styles.spacer} />
 
-        <PressableOpacity style={[styles.logoutRow, { borderColor: theme.wire }]} onPress={handleLogout}>
-          <Text style={[styles.logoutText, { color: theme.muted }]}>ログアウト</Text>
-        </PressableOpacity>
-
-        <PressableOpacity
-          style={[styles.deleteRow, { borderColor: theme.wire }]}
-          onPress={handleDeleteAccount}
-          disabled={isDeleting}
-        >
-          {isDeleting ? (
-            <ActivityIndicator size="small" color={theme.accent} />
-          ) : (
-            <Text style={[styles.deleteText, { color: theme.accent }]}>アカウントを削除</Text>
-          )}
-        </PressableOpacity>
+        <Text style={[styles.groupLabel, { color: theme.muted }]}>アカウント</Text>
+        <View style={[styles.group, { backgroundColor: theme.panel }, cardShadow]}>
+          <PressableOpacity style={styles.actionRow} onPress={handleLogout}>
+            <Text style={[styles.actionText, { color: theme.muted }]}>ログアウト</Text>
+          </PressableOpacity>
+          <PressableOpacity
+            style={[styles.actionRow, { borderTopWidth: 1, borderTopColor: theme.line }]}
+            onPress={handleDeleteAccount}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={theme.accent} />
+            ) : (
+              <Text style={[styles.actionText, styles.actionTextDanger, { color: theme.accent }]}>
+                アカウントを削除
+              </Text>
+            )}
+          </PressableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
 }
 
+const cardShadow = Platform.select({
+  ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.07, shadowRadius: 16 },
+  android: { elevation: 2 },
+});
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  container: { flex: 1, padding: 16, gap: 14 },
-  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 10, padding: 12 },
-  avatar: { width: 32, height: 32, borderRadius: 16 },
-  accountText: { fontSize: 13, fontWeight: '600' },
-  toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  toggleLabel: { fontSize: 13, fontWeight: '600' },
-  xConnectRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  xConnectStatus: { fontSize: 11, marginTop: 2 },
-  xConnectButton: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, minWidth: 84, alignItems: 'center' },
+  container: { flex: 1, padding: 16 },
+  pageTitle: { fontSize: 26, fontWeight: '800', marginBottom: 16 },
+  accountRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 16, padding: 13, marginBottom: 20 },
+  avatar: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontWeight: '800', fontSize: 15 },
+  accountText: { fontSize: 13.5, fontWeight: '700' },
+  accountSub: { fontSize: 11, marginTop: 1 },
+  groupLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 8, marginLeft: 4 },
+  group: { borderRadius: 16, marginBottom: 20, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 13 },
+  rowIcon: { width: 27, height: 27, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  rowCopy: { flex: 1, minWidth: 0 },
+  rowTitle: { fontSize: 13.5, fontWeight: '600' },
+  rowSub: { fontSize: 11, marginTop: 1 },
+  xConnectButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1.4, minWidth: 78, alignItems: 'center' },
   xConnectButtonText: { fontSize: 12, fontWeight: '700' },
-  sectionLabel: { fontSize: 11, marginTop: 4 },
+  toneGroup: { padding: 10 },
   toneRow: { flexDirection: 'row', gap: 8 },
-  toneOption: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5 },
-  toneOptionText: { fontSize: 12, fontWeight: '700' },
+  toneOption: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center' },
+  toneOptionText: { fontSize: 12.5, fontWeight: '700' },
   spacer: { flex: 1 },
-  logoutRow: { borderWidth: 1.5, borderRadius: 10, padding: 12, alignItems: 'center' },
-  logoutText: { fontSize: 13, fontWeight: '600' },
-  deleteRow: { borderWidth: 1.5, borderRadius: 10, padding: 12, alignItems: 'center' },
-  deleteText: { fontSize: 13, fontWeight: '700' },
+  actionRow: { padding: 13, alignItems: 'center' },
+  actionText: { fontSize: 13, fontWeight: '600' },
+  actionTextDanger: { fontWeight: '700' },
 });

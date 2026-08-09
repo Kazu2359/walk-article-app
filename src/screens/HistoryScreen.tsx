@@ -8,7 +8,9 @@ import {
   SectionList,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import type { MainTabScreenProps } from '../navigation/types';
 import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
@@ -121,34 +123,35 @@ export default function HistoryScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: theme.paper }]}>
       <View style={styles.container}>
-        <TextInput
-          style={[styles.search, { backgroundColor: theme.wireFill, borderColor: theme.wire, color: theme.ink }]}
-          placeholder="検索"
-          placeholderTextColor={theme.muted}
-          value={query}
-          onChangeText={setQuery}
-          onSubmitEditing={() => load(query)}
-          returnKeyType="search"
-        />
+        <Text style={[styles.pageTitle, { color: theme.ink }]}>履歴</Text>
 
-        <View style={styles.tabRow}>
+        <View style={[styles.searchPill, { backgroundColor: theme.wireFill }]}>
+          <Ionicons name="search-outline" size={16} color={theme.muted} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.ink }]}
+            placeholder="記事を検索"
+            placeholderTextColor={theme.muted}
+            value={query}
+            onChangeText={setQuery}
+            onSubmitEditing={() => load(query)}
+            returnKeyType="search"
+          />
+        </View>
+
+        <View style={[styles.segctl, { backgroundColor: theme.wireFill }]}>
           <PressableOpacity
-            style={[
-              styles.tabButton,
-              { backgroundColor: tab === 'note' ? theme.accent : theme.wireFill, borderColor: tab === 'note' ? theme.accent : theme.wire },
-            ]}
+            style={[styles.segButton, tab === 'note' && { backgroundColor: theme.panel, ...segShadow }]}
             onPress={() => setTab('note')}
           >
-            <Text style={[styles.tabButtonText, { color: tab === 'note' ? '#fff' : theme.muted }]}>Note</Text>
+            <View style={[styles.segDot, { backgroundColor: tab === 'note' ? theme.accent : theme.muted }]} />
+            <Text style={[styles.segButtonText, { color: tab === 'note' ? theme.ink : theme.muted }]}>Note</Text>
           </PressableOpacity>
           <PressableOpacity
-            style={[
-              styles.tabButton,
-              { backgroundColor: tab === 'x' ? theme.accent : theme.wireFill, borderColor: tab === 'x' ? theme.accent : theme.wire },
-            ]}
+            style={[styles.segButton, tab === 'x' && { backgroundColor: theme.panel, ...segShadow }]}
             onPress={() => setTab('x')}
           >
-            <Text style={[styles.tabButtonText, { color: tab === 'x' ? '#fff' : theme.muted }]}>X</Text>
+            <View style={[styles.segDot, { backgroundColor: tab === 'x' ? theme.accent : theme.muted }]} />
+            <Text style={[styles.segButtonText, { color: tab === 'x' ? theme.ink : theme.muted }]}>X</Text>
           </PressableOpacity>
         </View>
 
@@ -186,20 +189,29 @@ export default function HistoryScreen({ navigation }: Props) {
             )}
             renderItem={({ item }) => (
               <PressableOpacity
-                style={[styles.card, { borderColor: theme.wire, backgroundColor: theme.panel }]}
+                style={[styles.card, { backgroundColor: theme.panel }]}
                 onPress={() => navigation.navigate('ArticlePreview', { recordingId: item.recordingId })}
               >
-                <View style={styles.cardTop}>
-                  <Text style={[styles.cardTitle, { color: theme.ink }]} numberOfLines={1}>
-                    {item.title || item.excerpt}
-                  </Text>
-                  <Text style={[styles.cardTime, { color: theme.muted }]}>{formatTime(item.recordedAt)}</Text>
+                <View style={[styles.cardBadge, { backgroundColor: theme.accentDim }]}>
+                  {item.platform === 'note' ? (
+                    <Ionicons name="document-text-outline" size={15} color={theme.accent} />
+                  ) : (
+                    <Text style={[styles.cardBadgeX, { color: theme.accent }]}>X</Text>
+                  )}
                 </View>
-                {item.title ? (
-                  <Text style={[styles.cardExcerpt, { color: theme.muted }]} numberOfLines={2}>
-                    {item.excerpt}
-                  </Text>
-                ) : null}
+                <View style={styles.cardCopy}>
+                  <View style={styles.cardTop}>
+                    <Text style={[styles.cardTitle, { color: theme.ink }]} numberOfLines={1}>
+                      {item.title || item.excerpt}
+                    </Text>
+                    <Text style={[styles.cardTime, { color: theme.muted }]}>{formatTime(item.recordedAt)}</Text>
+                  </View>
+                  {item.title ? (
+                    <Text style={[styles.cardExcerpt, { color: theme.muted }]} numberOfLines={2}>
+                      {item.excerpt}
+                    </Text>
+                  ) : null}
+                </View>
               </PressableOpacity>
             )}
           />
@@ -209,20 +221,40 @@ export default function HistoryScreen({ navigation }: Props) {
   );
 }
 
+const segShadow = Platform.select({
+  ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 6 },
+  android: { elevation: 2 },
+});
+
 const styles = StyleSheet.create({
   safeArea: { flex: 1 },
-  container: { flex: 1, padding: 16, gap: 10 },
-  search: { height: 38, borderRadius: 8, borderWidth: 1, paddingHorizontal: 12, fontSize: 13 },
-  tabRow: { flexDirection: 'row', gap: 6 },
-  tabButton: { flex: 1, height: 34, borderRadius: 8, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  tabButtonText: { fontSize: 13, fontWeight: '700' },
+  container: { flex: 1, paddingHorizontal: 16, paddingTop: 6, gap: 12 },
+  pageTitle: { fontSize: 26, fontWeight: '800', marginBottom: 2 },
+  searchPill: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 42, borderRadius: 12, paddingHorizontal: 14 },
+  searchInput: { flex: 1, fontSize: 13, height: '100%' },
+  segctl: { flexDirection: 'row', borderRadius: 11, padding: 3, gap: 3 },
+  segButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, height: 34, borderRadius: 8 },
+  segDot: { width: 6, height: 6, borderRadius: 3 },
+  segButtonText: { fontSize: 12.5, fontWeight: '700' },
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 },
   emptyText: { fontSize: 13 },
   emptyLink: { fontSize: 13, fontWeight: '700' },
-  dateHeading: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, paddingTop: 12, paddingBottom: 4 },
-  card: { gap: 4, borderWidth: 1.5, borderRadius: 12, padding: 11 },
-  cardTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  dateHeading: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4, textTransform: 'uppercase', paddingTop: 12, paddingBottom: 6 },
+  card: {
+    flexDirection: 'row',
+    gap: 11,
+    borderRadius: 16,
+    padding: 13,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.07, shadowRadius: 12 },
+      android: { elevation: 2 },
+    }),
+  },
+  cardBadge: { width: 30, height: 30, borderRadius: 9, alignItems: 'center', justifyContent: 'center', marginTop: 1 },
+  cardBadgeX: { fontSize: 13, fontWeight: '800' },
+  cardCopy: { flex: 1, minWidth: 0, gap: 3 },
+  cardTop: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   cardTitle: { flex: 1, fontSize: 14, fontWeight: '700' },
-  cardTime: { fontSize: 11 },
+  cardTime: { fontSize: 10.5 },
   cardExcerpt: { fontSize: 12, lineHeight: 17 },
 });

@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import type { MainTabParamList } from './types';
 import HomeScreen from '../screens/HomeScreen';
@@ -8,10 +8,10 @@ import { useTheme } from '../constants/theme';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const TAB_ICONS: Record<keyof MainTabParamList, string> = {
-  Home: '🏠',
-  History: '🕘',
-  Settings: '⚙️',
+const TAB_ICONS: Record<keyof MainTabParamList, keyof typeof Ionicons.glyphMap> = {
+  Home: 'home-outline',
+  History: 'time-outline',
+  Settings: 'settings-outline',
 };
 
 const TAB_LABELS: Record<keyof MainTabParamList, string> = {
@@ -31,8 +31,8 @@ export default function MainTabs() {
         tabBarInactiveTintColor: theme.muted,
         tabBarStyle: { backgroundColor: theme.paper, borderTopColor: theme.wire },
         tabBarLabel: TAB_LABELS[route.name as keyof MainTabParamList],
-        tabBarIcon: ({ color }) => (
-          <Text style={{ fontSize: 18, color }}>{TAB_ICONS[route.name as keyof MainTabParamList]}</Text>
+        tabBarIcon: ({ color, size }) => (
+          <Ionicons name={TAB_ICONS[route.name as keyof MainTabParamList]} size={size} color={color} />
         ),
       })}
     >
