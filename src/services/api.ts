@@ -131,6 +131,8 @@ export interface RecordingArticle {
   title: string | null;
   body: string;
   editedBody: string | null;
+  postedAt: string | null;
+  postUrl: string | null;
 }
 
 export function getRecordingArticles(
@@ -177,7 +179,21 @@ export function deleteArticle(accessToken: string, articleId: string): Promise<v
   return request(`/v1/articles/${articleId}`, { method: 'DELETE', accessToken });
 }
 
+// Phase4: X API経由での自動投稿
+export function postArticleToX(
+  accessToken: string,
+  articleId: string,
+): Promise<{ postedAt: string; postUrl: string }> {
+  return request(`/v1/articles/${articleId}/post-to-x`, { method: 'POST', accessToken });
+}
+
 // ---- 設定・アカウント（§13） ----
+
+export function getMe(
+  accessToken: string,
+): Promise<{ id: string; displayName: string | null; email: string | null; xConnected: boolean }> {
+  return request('/v1/me', { accessToken });
+}
 
 export function getSettings(accessToken: string): Promise<{ tone: Tone; autoPostXEnabled: boolean }> {
   return request('/v1/me/settings', { accessToken });
@@ -197,4 +213,16 @@ export function registerPushToken(accessToken: string, expoPushToken: string): P
 // App Store審査ガイドライン5.1.1(v)対応。関連する録音・記事・音声も含めてサーバー側で完全削除する
 export function deleteAccount(accessToken: string): Promise<void> {
   return request('/v1/me', { method: 'DELETE', accessToken });
+}
+
+// Phase4: X OAuth連携
+export function connectXAccount(
+  accessToken: string,
+  params: { code: string; codeVerifier: string; redirectUri: string },
+): Promise<{ connected: boolean }> {
+  return request('/v1/me/x-connection', { method: 'POST', body: params, accessToken });
+}
+
+export function disconnectXAccount(accessToken: string): Promise<void> {
+  return request('/v1/me/x-connection', { method: 'DELETE', accessToken });
 }

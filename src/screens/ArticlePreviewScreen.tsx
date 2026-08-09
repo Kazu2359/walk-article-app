@@ -19,9 +19,12 @@ import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
 import {
+  ApiError,
   deleteArticle,
+  getMe,
   getRecordingArticles,
   markArticleCopied,
+  postArticleToX,
   updateArticle,
   type RecordingArticle,
 } from '../services/api';
@@ -44,6 +47,8 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
   const [copied, setCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [xConnected, setXConnected] = useState(false);
+  const [isPostingToX, setIsPostingToX] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -57,6 +62,15 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
       .catch(() => Alert.alert('記事の取得に失敗しました'))
       .finally(() => setIsLoading(false));
   }, [accessToken, recordingId]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    getMe(accessToken)
+      .then((me) => setXConnected(me.xConnected))
+      .catch(() => {
+        // 取得失敗時は未連携として表示する
+      });
+  }, [accessToken]);
 
   useEffect(() => {
     const current = articles?.[tab];
@@ -126,6 +140,45 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
       }
     } catch {
       Alert.alert('コピーしました', `${tab === 'x' ? 'X' : 'Note'}を開けませんでした。アプリを開いて貼り付けてください。`);
+    }
+  };
+
+  const handlePostToX = () => {
+    const current = articles?.[tab];
+    if (!current || !accessToken) return;
+
+    Alert.alert('Xに投稿しますか？', '投稿するとXに公開され、取り消せません。', [
+      { text: 'キャンセル', style: 'cancel' },
+      {
+        text: '投稿する',
+        onPress: async () => {
+          setIsPostingToX(true);
+          try {
+            const { postedAt, postUrl } = await postArticleToX(accessToken, current.id);
+            setArticles((prev) =>
+              prev ? { ...prev, [tab]: { ...current, postedAt, postUrl } } : prev,
+            );
+          } catch (error) {
+            const message =
+              error instanceof ApiError && error.code === 'X_NOT_CONNECTED'
+                ? '設定画面でXアカウントを連携してください。'
+                : 'しばらくしてからもう一度お試しください。';
+            Alert.alert('Xへの投稿に失敗しました', message);
+          } finally {
+            setIsPostingToX(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleOpenPostedX = async () => {
+    const current = articles?.[tab];
+    if (!current?.postUrl) return;
+    try {
+      await Linking.openURL(current.postUrl);
+    } catch {
+      Alert.alert('Xを開けませんでした');
     }
   };
 
@@ -235,9 +288,33 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
           </View>
         </InputAccessoryView>
 
-        <PressableOpacity style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={handleCopy}>
-          <Text style={styles.primaryButtonText}>{copied ? 'コピーしました' : 'コピーして開く'}</Text>
-        </PressableOpacity>
+        {tab === 'x' && xConnected && (
+          <PressableOpacity
+            style={[styles.primaryButton, { backgroundColor: theme.accent }]}
+            onPress={articles[tab]?.postedAt && articles[tab]?.postUrl ? handleOpenPostedX : handlePostToX}
+            disabled={isPostingToX}
+          >
+            {isPostingToX ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {articles[tab]?.postedAt && articles[tab]?.postUrl ? '投稿済み（開く）' : 'Xに投稿する'}
+              </Text>
+            )}
+          </PressableOpacity>
+        )}
+
+        {tab === 'x' && xConnected ? (
+          <PressableOpacity style={[styles.saveButton, { borderColor: theme.accent }]} onPress={handleCopy}>
+            <Text style={[styles.saveButtonText, { color: theme.accent }]}>
+              {copied ? 'コピーしました' : 'コピーして開く'}
+            </Text>
+          </PressableOpacity>
+        ) : (
+          <PressableOpacity style={[styles.primaryButton, { backgroundColor: theme.accent }]} onPress={handleCopy}>
+            <Text style={styles.primaryButtonText}>{copied ? 'コピーしました' : 'コピーして開く'}</Text>
+          </PressableOpacity>
+        )}
 
         <PressableOpacity onPress={() => navigation.navigate('Main', { screen: 'History' })}>
           <Text style={[styles.link, { color: theme.muted }]}>履歴一覧へ</Text>

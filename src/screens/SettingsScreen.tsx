@@ -1,13 +1,23 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View, SafeAreaView, Switch, ActivityIndicator, Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as AuthSession from 'expo-auth-session';
 import Constants from 'expo-constants';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { MainTabScreenProps, RootStackParamList } from '../navigation/types';
 import PressableOpacity from '../components/PressableOpacity';
 import { useTheme } from '../constants/theme';
 import { useAuth } from '../hooks/AuthContext';
-import { deleteAccount, getSettings, registerPushToken, updateSettings, type Tone } from '../services/api';
+import {
+  connectXAccount,
+  deleteAccount,
+  disconnectXAccount,
+  getMe,
+  getSettings,
+  registerPushToken,
+  updateSettings,
+  type Tone,
+} from '../services/api';
 
 type Props = MainTabScreenProps<'Settings'>;
 
@@ -16,14 +26,30 @@ const TONE_OPTIONS: Array<{ value: Tone; label: string }> = [
   { value: 'polite', label: '丁寧語' },
 ];
 
+// Phase4: X OAuth2連携（PKCE）
+const X_AUTHORIZATION_ENDPOINT = 'https://x.com/i/oauth2/authorize';
+const X_CLIENT_ID = process.env.EXPO_PUBLIC_X_CLIENT_ID ?? '';
+const X_REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'walkarticleapp', path: 'x-oauth-callback' });
+
 export default function SettingsScreen({ navigation }: Props) {
   const theme = useTheme();
   const { accessToken, signOut } = useAuth();
-  const [xLinked, setXLinked] = useState(false);
+  const [xConnected, setXConnected] = useState(false);
+  const [isConnectingX, setIsConnectingX] = useState(false);
   const [autoPost, setAutoPost] = useState(false);
   const [tone, setTone] = useState<Tone>('casual');
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const [xAuthRequest, , promptXAuthAsync] = AuthSession.useAuthRequest(
+    {
+      clientId: X_CLIENT_ID,
+      scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+      redirectUri: X_REDIRECT_URI,
+      usePKCE: true,
+    },
+    { authorizationEndpoint: X_AUTHORIZATION_ENDPOINT },
+  );
 
   useEffect(() => {
     if (!accessToken) return;
@@ -36,6 +62,15 @@ export default function SettingsScreen({ navigation }: Props) {
         // 取得失敗時は既定値（カジュアル・自動投稿OFF）のまま表示する
       })
       .finally(() => setIsLoading(false));
+  }, [accessToken]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    getMe(accessToken)
+      .then((me) => setXConnected(me.xConnected))
+      .catch(() => {
+        // 取得失敗時は未連携として表示する
+      });
   }, [accessToken]);
 
   useEffect(() => {
@@ -69,6 +104,42 @@ export default function SettingsScreen({ navigation }: Props) {
       updateSettings(accessToken, { autoPostXEnabled: value }).catch(() => {
         // 保存失敗時も画面上のトグル状態はそのまま残す
       });
+    }
+  };
+
+  const handleConnectX = async () => {
+    if (!accessToken || !xAuthRequest || isConnectingX) return;
+    setIsConnectingX(true);
+    try {
+      const result = await promptXAuthAsync();
+      if (result.type === 'success') {
+        await connectXAccount(accessToken, {
+          code: result.params.code,
+          codeVerifier: xAuthRequest.codeVerifier ?? '',
+          redirectUri: X_REDIRECT_URI,
+        });
+        setXConnected(true);
+      } else if (result.type === 'error') {
+        Alert.alert('X連携に失敗しました', 'しばらくしてからもう一度お試しください。');
+      }
+    } catch {
+      Alert.alert('X連携に失敗しました', 'しばらくしてからもう一度お試しください。');
+    } finally {
+      setIsConnectingX(false);
+    }
+  };
+
+  const handleDisconnectX = async () => {
+    if (!accessToken || isConnectingX) return;
+    setIsConnectingX(true);
+    try {
+      await disconnectXAccount(accessToken);
+      setXConnected(false);
+      setAutoPost(false);
+    } catch {
+      Alert.alert('連携解除に失敗しました', 'しばらくしてからもう一度お試しください。');
+    } finally {
+      setIsConnectingX(false);
     }
   };
 
@@ -127,17 +198,34 @@ export default function SettingsScreen({ navigation }: Props) {
           <Text style={[styles.accountText, { color: theme.ink }]}>Apple IDでログイン中</Text>
         </View>
 
-        <View style={styles.toggleRow}>
-          <Text style={[styles.toggleLabel, { color: theme.ink }]}>X連携（Phase2で対応予定）</Text>
-          <Switch value={xLinked} onValueChange={setXLinked} trackColor={{ true: theme.accent }} />
+        <View style={styles.xConnectRow}>
+          <View>
+            <Text style={[styles.toggleLabel, { color: theme.ink }]}>X連携</Text>
+            <Text style={[styles.xConnectStatus, { color: theme.muted }]}>
+              {xConnected ? '連携済み' : '未連携'}
+            </Text>
+          </View>
+          <PressableOpacity
+            style={[styles.xConnectButton, { borderColor: theme.accent }]}
+            onPress={xConnected ? handleDisconnectX : handleConnectX}
+            disabled={isConnectingX || (!xConnected && !xAuthRequest)}
+          >
+            {isConnectingX ? (
+              <ActivityIndicator size="small" color={theme.accent} />
+            ) : (
+              <Text style={[styles.xConnectButtonText, { color: theme.accent }]}>
+                {xConnected ? '解除する' : '連携する'}
+              </Text>
+            )}
+          </PressableOpacity>
         </View>
 
         <View style={styles.toggleRow}>
-          <Text style={[styles.toggleLabel, { color: theme.ink }]}>自動投稿（X限定・Phase2）</Text>
+          <Text style={[styles.toggleLabel, { color: theme.ink }]}>自動投稿（X限定）</Text>
           <Switch
             value={autoPost}
             onValueChange={handleToggleAutoPost}
-            disabled={!xLinked}
+            disabled={!xConnected}
             trackColor={{ true: theme.accent }}
           />
         </View>
@@ -194,6 +282,10 @@ const styles = StyleSheet.create({
   accountText: { fontSize: 13, fontWeight: '600' },
   toggleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   toggleLabel: { fontSize: 13, fontWeight: '600' },
+  xConnectRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  xConnectStatus: { fontSize: 11, marginTop: 2 },
+  xConnectButton: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 8, borderWidth: 1.5, minWidth: 84, alignItems: 'center' },
+  xConnectButtonText: { fontSize: 12, fontWeight: '700' },
   sectionLabel: { fontSize: 11, marginTop: 4 },
   toneRow: { flexDirection: 'row', gap: 8 },
   toneOption: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, borderWidth: 1.5 },
