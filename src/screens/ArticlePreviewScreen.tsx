@@ -159,10 +159,14 @@ export default function ArticlePreviewScreen({ navigation, route }: Props) {
               prev ? { ...prev, [tab]: { ...current, postedAt, postUrl } } : prev,
             );
           } catch (error) {
-            const message =
-              error instanceof ApiError && error.code === 'X_NOT_CONNECTED'
-                ? '設定画面でXアカウントを連携してください。'
-                : 'しばらくしてからもう一度お試しください。';
+            let message = 'しばらくしてからもう一度お試しください。';
+            if (error instanceof ApiError) {
+              if (error.code === 'X_NOT_CONNECTED') {
+                message = '設定画面でXアカウントを連携してください。';
+              } else if (error.code === 'X_POST_LIMIT_REACHED') {
+                message = '今月のX投稿上限に達したため、投稿を停止しています。';
+              }
+            }
             Alert.alert('Xへの投稿に失敗しました', message);
           } finally {
             setIsPostingToX(false);
